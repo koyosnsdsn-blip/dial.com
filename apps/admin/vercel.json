@@ -1,7 +1,3 @@
 {
-  "functions": {
-    "server/api/**": {
-      "regions": ["hnd1"]
-    }
-  }
+  "regions": ["hnd1"]
 }
