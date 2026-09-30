@@ -34,6 +34,7 @@ async function submit() {
 </script>
 
 <template>
+  <div class="auth-page">
   <main class="card">
     <h1>ダイヤル.com 管理画面</h1>
     <form @submit.prevent="submit">
@@ -48,4 +49,5 @@ async function submit() {
       このあと認証アプリ（Google Authenticator 等）の6桁コードの入力が必要です。
     </p>
   </main>
+  </div>
 </template>

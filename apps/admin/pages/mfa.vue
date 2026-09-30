@@ -73,6 +73,7 @@ async function submit() {
 </script>
 
 <template>
+  <div class="auth-page">
   <main class="card">
     <h1>2段階認証</h1>
 
@@ -111,4 +112,5 @@ async function submit() {
 
     <button class="secondary" type="button" @click="signOut">別のアカウントでログインする</button>
   </main>
+  </div>
 </template>
