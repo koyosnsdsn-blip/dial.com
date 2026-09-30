@@ -6,7 +6,9 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     // サーバー側のみで参照可能（server/api/ 内）
-    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    // 値はビルド時に埋め込まず、実行時に環境変数 SUPABASE_SERVICE_ROLE_KEY から読む（server/utils/db.ts）。
+    // ビルド成果物に秘密鍵を残さないため。Production 環境にのみ設定する（CLAUDE.md 制約#4）
+    supabaseServiceRoleKey: "",
     public: {
       // クライアント側にも公開される値。anonキーはRLS前提のため公開可
       supabaseUrl: process.env.SUPABASE_URL,

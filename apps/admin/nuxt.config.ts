@@ -14,6 +14,9 @@ export default defineNuxtConfig({
   supabase: {
     url: process.env.SUPABASE_URL,
     key: process.env.SUPABASE_ANON_KEY,
+    // モジュールは既定で SUPABASE_SERVICE_ROLE_KEY を拾ってビルド成果物に埋め込むため、明示的に空にする。
+    // service role のクライアントは server/utils/db.ts で実行時に環境変数から作る
+    secretKey: "",
     // 自動リダイレクトは使わず、MFA（aal2）と相談員判定まで含めた独自のガード（middleware/auth.global.ts）で制御する
     redirect: false,
     types: false,
@@ -27,7 +30,9 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    // 値はビルド時に埋め込まず、実行時に環境変数 SUPABASE_SERVICE_ROLE_KEY から読む（server/utils/db.ts）。
+    // ビルド成果物に秘密鍵を残さないため。Production 環境にのみ設定する（CLAUDE.md 制約#4）
+    supabaseServiceRoleKey: "",
     public: {
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
