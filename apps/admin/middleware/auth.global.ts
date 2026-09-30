@@ -12,7 +12,7 @@
 //
 // ここは画面遷移のためのガードであり、データを守る最終防衛線ではない。
 // サーバーAPIは server/utils/auth.ts の requireStaff() で、DBはRLSで、それぞれ独立に同じ条件を検査する。
-const ADMIN_ONLY = ["/staff", "/audit", "/clients", "/accounts", "/settings", "/templates", "/notices", "/inquiries", "/deletions"];
+const ADMIN_ONLY = ["/staff", "/audit", "/clients", "/accounts", "/settings", "/templates", "/notices", "/inquiries", "/deletions", "/genres", "/videos", "/disclosures", "/mail-templates", "/auto-texts", "/reuse-consents"];
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (to.path === "/accept-invite") return;

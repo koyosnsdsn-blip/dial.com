@@ -15,6 +15,12 @@ export const SETTING_DEFS: SettingDef[] = [
   { key: "report_min_total", label: "四半期レポートで内訳を出す最小の相談件数", unit: "件", def: 10, min: 10, max: 1000, note: "企業契約型が対象。総件数がこれ未満の四半期は、件数だけを出し、内訳は出さない（要件 7.6.3）。10件より小さくはできない。変更は、次に作成するレポートから適用" },
   { key: "report_min_genre", label: "四半期レポートでジャンルを個別に出す最小の件数", unit: "件", def: 5, min: 5, max: 1000, note: "企業契約型が対象。これ未満のジャンルは「その他」に合算する（要件 7.6.3）。5件より小さくはできない" },
   { key: "small_client_members", label: "相談に関する数値を出さない従業員数の上限", unit: "人未満", def: 30, min: 1, max: 100000, note: "契約上の従業員数がこの人数未満の企業契約型クライアントには、四半期レポートで相談に関する数値を出さない（要件 7.6.4、【仮】30人）" },
+  { key: "qa_discard_suspend", label: "投稿機能を止めるまでの破棄の回数", unit: "回", def: 3, min: 2, max: 50, note: "Q&A の投稿が破棄された回数がこの回数に達すると、その利用者の投稿機能を自動で止める。閲覧と相談は止めない（要件 6.4.6、未決事項 No.32）" },
+  { key: "qa_return_max", label: "却下による投稿枠の返却（月あたり）", unit: "回", def: 2, min: 0, max: 2, note: "却下された投稿の枠を返す回数の上限（要件 6.4.6、未決事項 No.34）。2回より多くはできない" },
+  { key: "qa_resubmit_max", label: "同じ投稿の書き直しの上限", unit: "回", def: 2, min: 0, max: 10, note: "却下（区分E）された投稿を書き直して再投稿できる回数（要件 6.4.3、未決事項 No.31）" },
+  { key: "qa_report_auto_hide", label: "通報による自動の一時非公開", unit: "件", def: 5, min: 2, max: 1000, note: "未対応の通報がこの件数に達した記事を、自動で一時非公開にする（要件 2.8、未決事項 No.52）" },
+  { key: "reuse_expire_days", label: "二次利用同意の依頼の期限", unit: "日", def: 30, min: 1, max: 365, note: "この日数のあいだ応答がない依頼は失効し、記事化の対象にしない（要件 7.13.3、未決事項 No.50）。変更は、変更後の依頼から適用" },
+  { key: "disclosure_due_days", label: "開示請求の回答期限", unit: "日", def: 14, min: 1, max: 90, note: "受付からこの日数を回答期限として表示する（要件 7.13.2、未決事項 No.51）" },
 ];
 
 export type Settings = Record<string, number>;

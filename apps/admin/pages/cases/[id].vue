@@ -4,7 +4,7 @@
 //           緊急フラグ、往復回数の調整、対応完了、アンケート回答の表示（3.11。設問は仮：No.38）、緊急対応の記録（3.5）、担当変更（管理者）、案件の通番（3.4.2）
 // 未実装（未決事項による）：SLAの期限表示（No.47）、相談サマリ（No.15）、
 //           相談者へのメール通知（No.59）、テンプレート挿入（7.15 マスタ未整備）
-type Message = { messageId: string; sender: "user" | "counselor"; body: string; sentAt: string };
+type Message = { messageId: string; sender: "user" | "counselor"; body: string; sentAt: string; attachments: string[] };
 type CaseDetail = {
   caseId: string;
   seq: number;
@@ -33,6 +33,7 @@ type CaseDetail = {
   canOperate: boolean;
   survey: { kind: "attr" | "chief"; question: string; answer: string }[];
   messages: Message[];
+  reuseStatus: string;
   rallyAdjustments: { delta: number; reason: string | null; adjustedAt: string; byName: string | null }[];
   emergencyRecords: { recordId: string; detection: string | null; judgment: string | null; actionTaken: string | null; recordedAt: string; byName: string | null }[];
 };
@@ -159,8 +160,83 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   if (draftTimer) clearTimeout(draftTimer);
 });
+// 返信に添付する画像（1通につき3枚まで。送る前に縮小し、撮影場所などの情報を取り除く）
+const images = ref<{ blob: Blob; url: string }[]>([]);
+const imageError = ref("");
+async function pickImages(event: Event) {
+  const input = event.target as HTMLInputElement;
+  imageError.value = "";
+  for (const file of Array.from(input.files ?? [])) {
+    if (images.value.length >= 3) {
+      imageError.value = "画像は1通につき3枚までです。";
+      break;
+    }
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      imageError.value = "画像は PNG または JPEG のみ送れます。";
+      continue;
+    }
+    try {
+      const blob = await shrinkImage(file);
+      images.value.push({ blob, url: URL.createObjectURL(blob) });
+    } catch {
+      imageError.value = "画像を読み込めませんでした。";
+    }
+  }
+  input.value = "";
+}
+function removeImage(i: number) {
+  URL.revokeObjectURL(images.value[i].url);
+  images.value.splice(i, 1);
+}
+
+// 過去の相談（経緯の確認。要件 3.9）。AI による経緯サマリは LLM が未設定のため作らず、元のやり取りを開いて確認する
+type Past = { caseId: string; openedAt: string; closedAt: string | null; closeReason: string | null; counselorName: string | null; chief: string[] };
+const history = ref<{ llm: { configured: boolean }; items: Past[] } | null>(null);
+const pastMessages = reactive<Record<string, { messageId: string; sender: "user" | "counselor"; body: string; sentAt: string }[]>>({});
+const historyError = ref("");
+async function loadHistory() {
+  historyError.value = "";
+  try {
+    history.value = await $fetch<{ llm: { configured: boolean }; items: Past[] }>(`/api/cases/${caseId.value}/history`);
+  } catch (e: any) {
+    historyError.value = apiErrorMessage(e);
+  }
+}
+async function openPast(p: Past) {
+  if (pastMessages[p.caseId]) {
+    delete pastMessages[p.caseId];
+    return;
+  }
+  try {
+    pastMessages[p.caseId] = await $fetch<{ messageId: string; sender: "user" | "counselor"; body: string; sentAt: string }[]>(`/api/cases/${caseId.value}/history/${p.caseId}`);
+  } catch (e: any) {
+    historyError.value = apiErrorMessage(e);
+  }
+}
+
+// 二次利用（Q&A としての公開）への同意の依頼（要件 9.4）
+const reuseReason = ref("");
+const REUSE_LABEL: Record<string, string> = { requested: "依頼済み（応答待ち）", agreed: "同意が得られています", declined: "同意が得られませんでした（記事にしません）", expired: "期限切れのため失効しました（記事にしません）" };
+async function requestReuse() {
+  const ok = await run("reuse", () => $fetch<unknown>(`/api/cases/${caseId.value}/reuse`, { method: "POST", body: { reason: reuseReason.value } }));
+  if (ok) reuseReason.value = "";
+}
+
 async function sendReply() {
-  const ok = await run("reply", () => $fetch<unknown>(`/api/cases/${caseId.value}/messages`, { method: "POST", body: { body: reply.value } }));
+  const ok = await run("reply", async () => {
+    let res: { failedImages?: number };
+    if (images.value.length) {
+      const form = new FormData();
+      form.append("body", reply.value);
+      images.value.forEach((img, i) => form.append("images", img.blob, `image-${i + 1}.jpg`));
+      res = await $fetch<{ failedImages?: number }>(`/api/cases/${caseId.value}/messages`, { method: "POST", body: form });
+    } else {
+      res = await $fetch<{ failedImages?: number }>(`/api/cases/${caseId.value}/messages`, { method: "POST", body: { body: reply.value } });
+    }
+    images.value.forEach((img) => URL.revokeObjectURL(img.url));
+    images.value = [];
+    if (res.failedImages) imageError.value = `返信は送信しましたが、画像 ${res.failedImages} 枚を送れませんでした。`;
+  });
   if (ok) {
     if (draftTimer) clearTimeout(draftTimer);
     draftLoaded = false;
@@ -305,6 +381,11 @@ onBeforeUnmount(() => clock && clearInterval(clock));
                 <li v-else :class="item.m.sender">
                   <div class="who">{{ item.m.sender === "user" ? "相談者" : "相談員" }}・{{ formatTime(item.m.sentAt) }}</div>
                   <div class="body">{{ item.m.body }}</div>
+                  <div v-if="item.m.attachments.length" class="images">
+                    <a v-for="a in item.m.attachments" :key="a" :href="`/api/cases/${detail.caseId}/attachments/${a}`" target="_blank" rel="noopener">
+                      <img :src="`/api/cases/${detail.caseId}/attachments/${a}`" alt="添付された画像" loading="lazy" />
+                    </a>
+                  </div>
                 </li>
               </template>
             </ol>
@@ -321,6 +402,11 @@ onBeforeUnmount(() => clock && clearInterval(clock));
               <p class="note">
                 送信すると往復回数を1回使います（残り {{ remaining }} 回）。<span v-if="remaining === 1"><b>この返信で上限に達し、案件は終了します。</b></span>
               </p>
+              <div v-if="images.length" class="picked">
+                <span v-for="(img, i) in images" :key="img.url"><img :src="img.url" alt="送信する画像" /><button class="secondary small" type="button" @click="removeImage(i)">外す</button></span>
+              </div>
+              <label class="attach">画像を添付する（3枚まで。PNG / JPEG）<input type="file" accept="image/png,image/jpeg" multiple :disabled="images.length >= 3" @change="pickImages" /></label>
+              <p v-if="imageError" class="error" role="alert">{{ imageError }}</p>
               <p class="draft-state" aria-live="polite">
                 {{ draftState === "saving" ? "下書きを保存しています…" : draftState === "saved" ? "下書きを保存しました" : draftState === "error" ? "下書きを保存できませんでした" : "" }}
               </p>
@@ -391,6 +477,41 @@ onBeforeUnmount(() => clock && clearInterval(clock));
             </section>
 
             <section class="panel">
+              <h2>これまでの経緯</h2>
+              <template v-if="history === null">
+                <p class="note">同じ相談者の、過去の相談を確認できます（参照は記録されます）。</p>
+                <button class="secondary" type="button" @click="loadHistory">過去の相談を表示する</button>
+              </template>
+              <template v-else>
+                <p class="note">AI による経緯サマリは、まだ利用できません（設定前）。過去のやり取りを開いて確認してください。</p>
+                <p v-if="history.items.length === 0" class="note">過去の相談はありません（今回が初回です）。</p>
+                <ul class="history">
+                  <li v-for="p in history.items" :key="p.caseId">
+                    <div class="meta-line">{{ formatDate(p.openedAt) }} 開始<span v-if="p.counselorName">（{{ p.counselorName }}）</span></div>
+                    <div v-if="p.chief.length">{{ p.chief.join("・") }}</div>
+                    <button class="secondary small" type="button" @click="openPast(p)">{{ pastMessages[p.caseId] ? "閉じる" : "やり取りを開く" }}</button>
+                    <ol v-if="pastMessages[p.caseId]" class="past">
+                      <li v-for="m in pastMessages[p.caseId]" :key="m.messageId"><b>{{ m.sender === "user" ? "相談者" : "相談員" }}</b>・{{ formatDateTime(m.sentAt) }}<br /><span class="pre">{{ m.body }}</span></li>
+                    </ol>
+                  </li>
+                </ul>
+              </template>
+              <p v-if="historyError" class="error" role="alert">{{ historyError }}</p>
+            </section>
+
+            <section v-if="detail.status === 'closed' && !detail.deletedByUser" class="panel">
+              <h2>Q&amp;A への掲載の同意</h2>
+              <p v-if="detail.reuseStatus !== 'unrequested'" class="note">{{ REUSE_LABEL[detail.reuseStatus] ?? detail.reuseStatus }}</p>
+              <template v-else-if="detail.canOperate">
+                <p class="note">この相談の内容を、匿名化したうえで Q&amp;A の記事にしたい場合に、ご本人へ同意を依頼します。利用者は相談の画面で答えます。断っても対応が変わらないことを、画面で伝えます。</p>
+                <label for="reuse-reason">依頼の理由（必須）</label>
+                <input id="reuse-reason" v-model="reuseReason" maxlength="500" placeholder="例：同じ悩みが多く寄せられているため" />
+                <button class="secondary" type="button" :disabled="busy !== '' || reuseReason.trim() === ''" @click="requestReuse">同意を依頼する</button>
+              </template>
+              <p v-else class="note">まだ依頼していません。</p>
+            </section>
+
+            <section class="panel">
               <h2>緊急対応の記録</h2>
               <template v-if="detail.canOperate">
                 <label for="em-detection">検知した内容（必須）</label>
@@ -451,6 +572,16 @@ button.danger { background: var(--danger); }
 select, textarea { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid var(--line); border-radius: 6px; font-family: inherit; }
 .messages { list-style: none; padding: 0; margin: 0 0 16px; display: flex; flex-direction: column; gap: 10px; }
 .messages li { max-width: 85%; padding: 10px 14px; border-radius: 8px; background: var(--bg); }
+.images { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.images img { display: block; max-width: 180px; max-height: 180px; border-radius: 6px; border: 1px solid var(--line); }
+.picked { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; }
+.picked span { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; }
+.picked img { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.picked button { margin: 0; width: auto; padding: 2px 8px; font-size: 12px; }
+.attach input { width: auto; padding: 4px 0; border: 0; font-size: 13px; }
+.past { margin: 8px 0 0; padding-left: 1.2em; font-size: 13px; }
+.past li { margin-bottom: 6px; }
+.pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .messages li.counselor { align-self: flex-end; background: #ddf4ff; }
 .messages li.date-sep { align-self: stretch; max-width: none; background: none; padding: 0; text-align: center; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); line-height: 0; margin: 10px 0; }
 .messages li.date-sep span { background: #fff; padding: 0 10px; }

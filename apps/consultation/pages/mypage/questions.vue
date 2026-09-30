@@ -6,7 +6,7 @@ type Item = {
   displayId: string | null;
   genre: string | null;
   body: string;
-  status: "pending" | "published" | "rejected" | "discarded" | "merged";
+  status: "pending" | "published" | "rejected" | "merged";
   unpublished: boolean;
   postedAt: string;
   publishedAt: string | null;
@@ -19,7 +19,7 @@ type Item = {
   needsConsultGuide: boolean;
 };
 type Mine = { canPost: boolean; suspended: boolean; remaining: number; items: Item[] };
-const STATUS: Record<Item["status"], string> = { pending: "確認中", published: "公開中", rejected: "公開されませんでした", discarded: "公開されませんでした", merged: "すでにある Q&A をご案内" };
+const STATUS: Record<Item["status"], string> = { pending: "確認中", published: "公開中", rejected: "公開されませんでした", merged: "すでにある Q&A をご案内" };
 
 const route = useRoute();
 const mine = ref<Mine | null>(null);

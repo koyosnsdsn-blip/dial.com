@@ -39,6 +39,8 @@ export default defineNuxtConfig({
       // ニックネーム登録で使う内部用の識別子のドメイン（apps/consultation/utils/nickname.ts を参照）。
       // 相談者側と管理側で必ず同じ値にすること。一度決めたら変えないこと
       nicknameDomain: process.env.NICKNAME_DOMAIN || "dialcom-op-dev.vercel.app",
+      // 相談者側アプリのアドレス（ランディングページの URL の表示に使う）。【仮】dev の値を既定にしている
+      userSiteUrl: process.env.USER_SITE_URL || "https://dialcom-op-dev.vercel.app",
     },
   },
 

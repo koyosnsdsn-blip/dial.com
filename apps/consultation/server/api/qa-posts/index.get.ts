@@ -40,7 +40,8 @@ export default defineEventHandler(async (event) => {
         displayId: r.display_id as string | null,
         genre: r.genre_id ? names.get(r.genre_id) ?? null : null,
         body: r.body as string,
-        status: r.status as "pending" | "published" | "rejected" | "discarded" | "merged",
+        // 破棄は、利用者には「公開されませんでした」とだけ伝える（区分は返さない）
+        status: (r.status === "discarded" ? "rejected" : r.status) as "pending" | "published" | "rejected" | "merged",
         unpublished: Boolean(r.unpublished_at),
         postedAt: r.posted_at as string,
         publishedAt: r.published_at as string | null,
@@ -48,12 +49,12 @@ export default defineEventHandler(async (event) => {
         // 匿名化のために運営が本文を修正した場合は、その旨を伝える（要件 6.4.2）
         anonymized,
         mergedInto: r.status === "merged" ? (r.merged_into as string | null) : null,
-        reasonCode: last ? (last.reason_code as string | null) : null,
+        reasonCode: last?.action === "reject" ? (last.reason_code as string | null) : null,
         // 却下は区分ごとの案内＋補足。破棄は定型文のみ（再投稿の案内はしない：6.4.1）
         reasonText: !last ? null : last.action === "discard" ? "この投稿は公開されませんでした。" : [REJECT_TEXT[last.reason_code] ?? "", last.reason_text ?? ""].filter(Boolean).join("\n"),
         quotaReturned: last ? Boolean(last.quota_returned) : r.status === "merged",
         canResubmit: f.qaPost && r.status === "rejected" && last?.reason_code === "E" && !resubmitted.has(r.question_id),
-        needsConsultGuide: last?.reason_code === "F",
+        needsConsultGuide: last?.action === "reject" && last.reason_code === "F",
       };
     }),
   };

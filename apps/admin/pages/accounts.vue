@@ -55,6 +55,38 @@ async function setSuspended(next: boolean) {
     saving.value = false;
   }
 }
+
+// 【仮】会員区分の手動切り替え（決済連携ができるまでの暫定）
+const tierReason = ref("");
+async function setTier(next: "free" | "paid") {
+  if (!account.value) return;
+  saving.value = true;
+  errorMessage.value = "";
+  try {
+    await $fetch<unknown>(`/api/accounts/${account.value.accountId}`, { method: "PATCH", body: { tier: next, reason: tierReason.value } });
+    tierReason.value = "";
+    await search();
+    message.value = next === "paid" ? "月額会員に切り替えました。" : "無料会員に切り替えました。";
+  } catch (e: any) {
+    errorMessage.value = apiErrorMessage(e);
+  } finally {
+    saving.value = false;
+  }
+}
+
+// 開示請求の受付（要件 7.13.2）
+const disclosureNote = ref("");
+const disclosureDone = ref(false);
+async function createDisclosure() {
+  if (!account.value) return;
+  try {
+    await $fetch<unknown>("/api/disclosures", { method: "POST", body: { accountId: account.value.accountId, note: disclosureNote.value } });
+    disclosureNote.value = "";
+    disclosureDone.value = true;
+  } catch (e: any) {
+    errorMessage.value = apiErrorMessage(e);
+  }
+}
 </script>
 
 <template>
@@ -90,6 +122,21 @@ async function setSuspended(next: boolean) {
         <p class="note">相談の内容は、この画面からは表示しません。</p>
 
         <template v-if="!account.deleted">
+          <h3>開示請求の受付</h3>
+          <p class="note">ご本人から、保有個人データ（相談の記録など）の開示を求められたときに登録します。以後の対応は「開示請求」の画面で行います。</p>
+          <label for="disc-note">受付の経緯のメモ（必須）</label>
+          <input id="disc-note" v-model="disclosureNote" maxlength="1000" placeholder="例：問い合わせフォームから申し出（10/1）" />
+          <button class="secondary" type="button" :disabled="saving || disclosureNote.trim() === ''" @click="createDisclosure">開示請求を受け付ける</button>
+          <p v-if="disclosureDone" class="note" role="status">受け付けました。<NuxtLink to="/disclosures">開示請求の画面へ</NuxtLink></p>
+          <template v-if="account.tier !== 'member'">
+            <h3>会員区分の切り替え（暫定）</h3>
+            <p class="note">月額課金の決済がまだ無いため、動作確認と初期の運用のために、手で切り替えられるようにしています。月額会員は、Q&amp;A の全文を読め、質問を投稿できます。</p>
+            <label for="tier-reason">理由（必須）</label>
+            <input id="tier-reason" v-model="tierReason" maxlength="500" placeholder="例：動作確認のため" />
+            <button class="secondary" type="button" :disabled="saving || tierReason.trim() === ''" @click="setTier(account.tier === 'paid' ? 'free' : 'paid')">
+              {{ account.tier === "paid" ? "無料会員に戻す" : "月額会員にする" }}
+            </button>
+          </template>
           <h3>投稿機能の{{ account.postingSuspended ? "停止を解除する" : "停止" }}</h3>
           <p class="note">停止するのはQ&Aへの投稿だけです。Q&Aの閲覧と、相談の利用は停止しません。</p>
           <label for="reason">理由（必須）</label>

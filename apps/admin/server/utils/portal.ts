@@ -101,6 +101,7 @@ export type ReportRow = {
   casesTotal: number | null;
   genres: { label: string; count: number }[] | null;
   slaRate: number | null;
+  videoViews: number | null;
   generatedAt: string;
 };
 export function toReportRow(r: any): ReportRow {
@@ -111,7 +112,8 @@ export function toReportRow(r: any): ReportRow {
     casesTotal: r.cases_total,
     genres: r.genres,
     slaRate: r.sla_rate,
+    videoViews: r.video_views ?? null,
     generatedAt: r.generated_at,
   };
 }
-export const REPORT_COLUMNS = "quarter_start, members, employee_count, cases_total, genres, sla_rate, generated_at";
+export const REPORT_COLUMNS = "quarter_start, members, employee_count, cases_total, genres, sla_rate, video_views, generated_at";

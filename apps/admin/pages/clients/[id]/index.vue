@@ -4,7 +4,8 @@
 // 変更はすべて理由が必須で、変更前後とあわせて監査ログに記録される。
 // 初回アンケートの追加設問（7.10.5）は別画面（/clients/[id]/survey）。
 // クライアント管理者アカウント（7.10.6）と四半期レポート（7.6.3）は、それぞれ部品（ClientAdminsPanel / ClientReportsPanel）に分けている。
-// 未実装：ランディングページ（7.10.7）、案件数の推移（7.10.2）
+// ランディングページ（7.10.7）は別画面（/clients/[id]/landing）。
+// 未実装：案件数の推移（7.10.2）
 type Detail = {
   clientId: string;
   name: string;
@@ -228,7 +229,7 @@ onMounted(load);
         <section v-if="detail.status === 'prep'" class="panel prep">
           <h2>「有効」に切り替える</h2>
           <p class="note">準備中の間は、招待コードが機能しません。設定を確認してから切り替えてください。</p>
-          <label class="check"><input v-model="activateChecked" type="checkbox" />機能設定・ラリー回数・返信SLAを確認しました（ランディングページは未実装のため対象外）</label>
+          <label class="check"><input v-model="activateChecked" type="checkbox" />機能設定・ラリー回数・返信SLAと、ランディングページの入稿状況を確認しました</label>
           <label for="act-reason">理由（必須）</label>
           <input id="act-reason" v-model="activateReason" maxlength="500" placeholder="例：契約締結・設定完了のため" />
           <button type="button" :disabled="busy !== '' || !activateChecked || activateReason.trim() === '' || !detail.inviteCode" @click="activate">有効にする</button>
@@ -328,6 +329,13 @@ onMounted(load);
           <h2>初回アンケートの追加設問</h2>
           <p class="note">このクライアントの所属者にだけ表示する設問（最大2問）を編集します。</p>
           <NuxtLink :to="`/clients/${detail.clientId}/survey`">追加設問を編集する →</NuxtLink>
+        </section>
+
+        <section class="panel">
+          <h2>ランディングページ・自動文面</h2>
+          <p class="note">所属の方へ案内する入口ページ（掲載コメント・連絡先・色）と、相談の画面に表示される案内の文面を編集します。</p>
+          <p><NuxtLink :to="`/clients/${detail.clientId}/landing`">ランディングページを入稿する →</NuxtLink></p>
+          <p><NuxtLink to="/auto-texts">自動文面を編集する（クライアントを選んで上書き）→</NuxtLink></p>
         </section>
 
         <ClientAdminsPanel :client-id="detail.clientId" :closed="closed" />

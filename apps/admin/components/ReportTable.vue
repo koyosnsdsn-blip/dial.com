@@ -8,6 +8,7 @@ export type ReportRow = {
   casesTotal: number | null;
   genres: { label: string; count: number }[] | null;
   slaRate: number | null;
+  videoViews: number | null;
   generatedAt: string;
 };
 defineProps<{ rows: ReportRow[]; contractType: "corp" | "muni" }>();
@@ -17,7 +18,7 @@ defineProps<{ rows: ReportRow[]; contractType: "corp" | "muni" }>();
   <div class="scroll">
     <table>
       <thead>
-        <tr><th>期間</th><th>登録件数</th><th>相談件数</th><th>相談内容の内訳</th><th>期限内に返信した割合</th></tr>
+        <tr><th>期間</th><th>登録件数</th><th>相談件数</th><th>相談内容の内訳</th><th>期限内に返信した割合</th><th>動画の視聴</th></tr>
       </thead>
       <tbody>
         <tr v-for="r in rows" :key="r.quarterStart">
@@ -33,6 +34,7 @@ defineProps<{ rows: ReportRow[]; contractType: "corp" | "muni" }>();
             <span v-else class="muted">—</span>
           </td>
           <td class="num">{{ r.slaRate === null ? "—" : `${r.slaRate}%` }}</td>
+          <td class="num">{{ r.videoViews === null ? "—" : `${r.videoViews} 回` }}</td>
         </tr>
       </tbody>
     </table>

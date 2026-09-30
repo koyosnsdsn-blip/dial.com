@@ -34,6 +34,9 @@ export default defineEventHandler(async (event) => {
 
   // 閲覧権限を確認できた案件についてのみ、service role で補足情報を読む
   const sdb = serviceDb(event);
+  const attached = await attachmentsOf(event, (messages ?? []).map((m: any) => m.message_id as string));
+  const { data: reuse } = await sdb.from("reuse_consents").select("status, expires_at").eq("case_id", caseId).maybeSingle();
+  const reuseStatus = !reuse ? "unrequested" : reuse.status === "requested" && reuse.expires_at && new Date(reuse.expires_at).getTime() <= Date.now() ? "expired" : (reuse.status as string);
   const limits = (await caseLimits(event, [caseId])).get(caseId);
   const settings = await getSettings(event);
   const [restart, names, frequent, deleted, { data: draft }] = await Promise.all([
@@ -95,7 +98,10 @@ export default defineEventHandler(async (event) => {
       sender: m.sender as "user" | "counselor",
       body: m.body as string,
       sentAt: m.sent_at as string,
+      attachments: attached.get(m.message_id) ?? [],
     })),
+    // 二次利用同意の状況（要件 9.4）。unrequested＝未依頼
+    reuseStatus,
     rallyAdjustments: (adjustments ?? []).map((a: any) => ({
       delta: a.delta as number,
       reason: a.reason as string | null,

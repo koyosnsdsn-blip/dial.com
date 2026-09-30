@@ -37,7 +37,7 @@ const filters = reactive({ status: "open", assignee: "all", kind: "all", urgent:
 const clientOptions = ref<ClientOption[]>([]);
 
 // 件数は、絞り込みに関係なく全体の状況を表示する（/api/dashboard-summary）
-type Summary = { awaiting: number; urgent: number; unassigned: number; busy: boolean; busyThreshold: number; inquiries: number; deletionFailed: number; deletionPending: number };
+type Summary = { awaiting: number; urgent: number; unassigned: number; busy: boolean; busyThreshold: number; inquiries: number; deletionFailed: number; deletionPending: number; qaPending: number; qaReports: number; disclosuresOpen: number; reuseWaiting: number };
 const summary = ref<Summary | null>(null);
 const urgentCount = computed(() => summary.value?.urgent ?? cases.value.filter((c) => c.urgent && c.status === "open").length);
 const awaitingCount = computed(() => summary.value?.awaiting ?? 0);
@@ -144,6 +144,9 @@ watch(filters, load);
         <div class="tile"><span class="num">{{ awaitingCount }}</span><span class="label">返信待ち</span></div>
         <div class="tile"><span class="num">{{ urgentCount }}</span><span class="label">緊急</span></div>
         <div v-if="staff?.role === 'admin'" class="tile"><span class="num">{{ unassignedCount }}</span><span class="label">未割当</span></div>
+        <NuxtLink v-if="summary && summary.qaPending > 0" to="/qa" class="tile link"><span class="num">{{ summary.qaPending }}</span><span class="label">Q&amp;A の回答待ち</span></NuxtLink>
+        <NuxtLink v-if="summary && summary.qaReports > 0" to="/qa-reports" class="tile link alert"><span class="num">{{ summary.qaReports }}</span><span class="label">未対応の通報</span></NuxtLink>
+        <NuxtLink v-if="staff?.role === 'admin' && summary && summary.disclosuresOpen > 0" to="/disclosures" class="tile link"><span class="num">{{ summary.disclosuresOpen }}</span><span class="label">開示請求（未回答）</span></NuxtLink>
         <NuxtLink v-if="staff?.role === 'admin' && summary && summary.inquiries > 0" to="/inquiries" class="tile link"><span class="num">{{ summary.inquiries }}</span><span class="label">未対応の問い合わせ</span></NuxtLink>
         <NuxtLink v-if="staff?.role === 'admin' && summary && summary.deletionFailed > 0" to="/deletions" class="tile link alert"><span class="num">{{ summary.deletionFailed }}</span><span class="label">削除の失敗</span></NuxtLink>
       </div>

@@ -41,6 +41,20 @@ async function retry(r: Row) {
     busy.value = "";
   }
 }
+// 添付ファイルの消去（DB の行を消したあと、保管先のファイルを消す処理）。通常は1日1回、自動で実行される
+const purging = ref(false);
+async function purgeFiles() {
+  purging.value = true;
+  message.value = "";
+  try {
+    const res = await $fetch<{ done: number; failed: number; remaining: number }>("/api/deletions/purge-files", { method: "POST" });
+    message.value = `添付ファイルを ${res.done} 件消去しました（失敗 ${res.failed} 件／残り ${res.remaining} 件）。`;
+  } catch (e: any) {
+    errorMessage.value = apiErrorMessage(e);
+  } finally {
+    purging.value = false;
+  }
+}
 onMounted(load);
 </script>
 
@@ -51,6 +65,10 @@ onMounted(load);
       <p><NuxtLink to="/ops">← 運営メニューへ戻る</NuxtLink></p>
       <h1>削除依頼の状況</h1>
       <p class="note">消去待ち {{ counts.pending }} 件／失敗 {{ counts.failed }} 件。猶予の日数は「サービス全体設定」で変更できます（変更は、変更後の削除から適用）。</p>
+      <p class="note">
+        相談に添付された画像は、相談の消去のあと、保管先からも消去します（1日1回、自動）。
+        <button class="secondary small" type="button" :disabled="purging" @click="purgeFiles">{{ purging ? "実行中…" : "添付ファイルの消去を、いま実行する" }}</button>
+      </p>
       <p v-if="message" class="ok" role="status">{{ message }}</p>
       <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
       <p v-if="loading" class="note">読み込み中…</p>

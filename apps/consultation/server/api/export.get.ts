@@ -5,7 +5,7 @@ import { isNicknameEmail } from "../../utils/nickname";
 // - 出力の操作を監査ログに記録する（7.16）
 // - 短時間の反復出力は不正なアクセスの兆候になり得るため、回数に上限を設ける
 // 【仮】上限は24時間に3回。形式は JSON（形式・提供方法は実装フェーズで定める、とされている）
-// 未対応：Q&Aの投稿と回答（機能1が未実装）、相談サマリ（未実装）
+// 未対応：相談サマリ（未実装）
 const MAX_EXPORTS_PER_DAY = 3;
 
 export default defineEventHandler(async (event) => {
@@ -50,6 +50,16 @@ export default defineEventHandler(async (event) => {
     .eq("account_id", account.userId);
   if (attrError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
 
+  // Q&A の投稿と回答、処理の結果（questions はブラウザに権限を与えていないため service role で、本人の行だけを読む）
+  const { data: posts, error: postError } = await sdb
+    .from("questions")
+    .select("display_id, body, status, posted_at, published_at, answers(body)")
+    .eq("account_id", account.userId)
+    .is("hidden_at", null)
+    .order("posted_at", { ascending: true });
+  if (postError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+  const postStatus: Record<string, string> = { pending: "確認中", published: "公開", rejected: "公開されませんでした", discarded: "公開されませんでした", merged: "すでにある Q&A をご案内" };
+
   await writeAudit(event, account, { action: "data.export", targetType: "accounts", targetId: account.userId });
 
   const closeReason: Record<string, string> = {
@@ -69,6 +79,13 @@ export default defineEventHandler(async (event) => {
       回答: a.option_label_snapshot,
       回答日時: a.answered_at,
       最終変更日時: a.updated_at,
+    })),
+    "Q&Aの投稿": ((posts ?? []) as any[]).map((p) => ({
+      表示ID: p.display_id,
+      投稿日時: p.posted_at,
+      状態: postStatus[p.status] ?? p.status,
+      質問: p.body,
+      回答: p.status === "published" ? (p.answers?.[0]?.body ?? null) : null,
     })),
     相談: (cases ?? []).map((c: any) => ({
       開始日時: c.opened_at,

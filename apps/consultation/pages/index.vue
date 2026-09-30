@@ -22,6 +22,7 @@
         <span>パスワードを忘れたときに、メールで再設定できます</span>
       </NuxtLink>
     </div>
+    <p class="note qa"><NuxtLink to="/qa">みなさまから寄せられた質問と、相談員の回答（Q&amp;A）を見る</NuxtLink></p>
     <EmergencyLink />
   </main>
 </template>
@@ -39,5 +40,6 @@
   border-radius: 12px;
 }
 .entry strong { display: block; font-size: 1.05rem; color: var(--accent); }
+.qa { text-align: center; margin: 4px 0 16px; }
 .entry span { font-size: 0.88rem; color: var(--muted); }
 </style>
