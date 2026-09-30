@@ -9,6 +9,7 @@ const roleLabel = computed(() => (isAdmin.value ? "運営管理者" : "相談員
     <nav class="nav">
       <NuxtLink to="/" class="brand">ダイヤル.com 管理</NuxtLink>
       <NuxtLink to="/">ダッシュボード</NuxtLink>
+      <NuxtLink v-if="isAdmin" to="/clients">契約クライアント</NuxtLink>
       <NuxtLink v-if="isAdmin" to="/staff">相談員の管理</NuxtLink>
       <NuxtLink v-if="isAdmin" to="/audit">監査ログ</NuxtLink>
     </nav>
@@ -33,6 +34,7 @@ const roleLabel = computed(() => (isAdmin.value ? "運営管理者" : "相談員
 .nav { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; font-size: 14px; }
 .nav a { color: var(--muted); text-decoration: none; }
 .nav a.router-link-exact-active { color: var(--fg); font-weight: 600; }
+.nav a.router-link-active:not([href="/"]) { color: var(--fg); font-weight: 600; }
 .nav .brand { font-weight: 700; color: var(--fg); margin-right: 8px; }
 .who { display: flex; align-items: center; gap: 12px; font-size: 14px; }
 button.small { margin: 0; width: auto; padding: 6px 12px; font-size: 13px; }

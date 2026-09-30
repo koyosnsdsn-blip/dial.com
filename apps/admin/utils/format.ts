@@ -84,7 +84,14 @@ export function apiErrorMessage(e: any): string {
     last_admin: "有効な運営管理者が1人もいなくなるため、変更できません。",
     handover_to_required: "担当中の案件があるため、引継ぎ先を選んでください。",
     invalid_handover: "引継ぎ先に選んだ相談員は有効ではありません。",
-    invalid_date: "不在期間の日付が正しくありません（開始と終了の両方を入力してください）。",
+    invalid_date: "日付が正しくありません（開始と終了の順序・入力もれを確認してください）。",
+    type_not_confirmed: "契約類型の確認にチェックを入れてください。登録後は変更できません。",
+    features_required: "機能をすべて無効にすることはできません。",
+    approved_by_required: "この設定には体制側の承認が必要です。承認者を入力してください。",
+    client_closed: "このクライアントは契約が終了しているため、変更できません。",
+    confirm_name_mismatch: "確認用に入力したクライアント名が一致しません。",
+    invite_code_missing: "招待コードが発行されていません。先に招待コードを発行してください。",
+    invalid_status: "この状態への変更はできません。",
   };
   if (message && map[message]) return map[message];
   if (typeof message === "string" && message.startsWith("invalid_")) return "入力内容が正しくありません。";
