@@ -4,7 +4,7 @@
 // 判定の順序：
 //   1. 未ログイン                     → /login
 //   2. ログイン済みだがMFA未通過（aal1） → /mfa（登録済みなら入力、未登録なら登録）
-//   3. MFA通過済みだが相談員として無効   → /forbidden
+//   3. MFA通過済みだが相談員として無効   → クライアント管理者なら /portal（それ以外の画面には入れない）、どちらでもなければ /forbidden
 //   4. 運営管理者専用の画面に相談員が来た → /
 //   5. すべて満たす                   → 目的の画面へ
 //
@@ -40,17 +40,26 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo("/mfa");
   }
 
+  // クライアント管理者は、クライアント管理サイト（/portal）だけを使える
+  if (usePortalAdmin().value) {
+    return to.path === "/portal" ? undefined : navigateTo("/portal");
+  }
+
   // 相談員判定は画面遷移のたびにサーバーへ問い合わせず、取得済みなら使い回す
   if (!useStaff().value) {
     const result = await loadStaff();
     if (result === "mfa") return navigateTo("/mfa");
     if (result === "signed_out") return navigateTo("/login");
     if (result === "forbidden") {
+      if (await loadPortalAdmin()) {
+        return to.path === "/portal" ? undefined : navigateTo("/portal");
+      }
       return to.path === "/forbidden" ? undefined : navigateTo("/forbidden");
     }
   }
 
-  if (to.path === "/forbidden") {
+  // ここから先は相談員・運営管理者。クライアント管理サイトは対象外
+  if (to.path === "/forbidden" || to.path.startsWith("/portal")) {
     return navigateTo("/");
   }
 

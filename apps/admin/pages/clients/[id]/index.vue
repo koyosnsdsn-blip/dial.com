@@ -3,8 +3,8 @@
 // 別のクライアントを誤って変更しないよう、編集中のクライアント名を常に表示する（7.10.1）。
 // 変更はすべて理由が必須で、変更前後とあわせて監査ログに記録される。
 // 初回アンケートの追加設問（7.10.5）は別画面（/clients/[id]/survey）。
-// 未実装：クライアント管理者アカウント（7.10.6）、ランディングページ（7.10.7）、
-//         実績利用率と案件数の推移（7.10.2）
+// クライアント管理者アカウント（7.10.6）と四半期レポート（7.6.3）は、それぞれ部品（ClientAdminsPanel / ClientReportsPanel）に分けている。
+// 未実装：ランディングページ（7.10.7）、案件数の推移（7.10.2）
 type Detail = {
   clientId: string;
   name: string;
@@ -329,6 +329,9 @@ onMounted(load);
           <p class="note">このクライアントの所属者にだけ表示する設問（最大2問）を編集します。</p>
           <NuxtLink :to="`/clients/${detail.clientId}/survey`">追加設問を編集する →</NuxtLink>
         </section>
+
+        <ClientAdminsPanel :client-id="detail.clientId" :closed="closed" />
+        <ClientReportsPanel :client-id="detail.clientId" :contract-type="detail.contractType" :prep="detail.status === 'prep'" />
 
         <section v-if="!closed" class="panel danger">
           <h2>契約を終了する</h2>

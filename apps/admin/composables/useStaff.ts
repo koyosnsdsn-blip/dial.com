@@ -29,5 +29,29 @@ export async function signOut() {
   const supabase = useSupabaseClient();
   await supabase.auth.signOut();
   useStaff().value = null;
+  usePortalAdmin().value = null;
   await navigateTo("/login");
+}
+
+// クライアント管理者（クライアント管理サイト /portal の利用者）。相談員・運営管理者とは別の役割で、/portal 以外には入れない。
+export type PortalAdmin = {
+  userId: string;
+  name: string;
+  clientName: string;
+  contractType: "corp" | "muni";
+  clientStatus: "prep" | "active" | "closed";
+  inviteCode: string | null;
+  featureConsult: boolean;
+};
+
+export const usePortalAdmin = () => useState<PortalAdmin | null>("portal-admin", () => null);
+
+export async function loadPortalAdmin(): Promise<PortalAdmin | null> {
+  const state = usePortalAdmin();
+  try {
+    state.value = await $fetch<PortalAdmin>("/api/portal/me");
+  } catch {
+    state.value = null;
+  }
+  return state.value;
 }

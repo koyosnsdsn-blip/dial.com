@@ -103,9 +103,18 @@ export function apiErrorMessage(e: any): string {
     invalid_options: "選択肢は2〜10個、それぞれ50文字以内で、重複のないように入力してください。",
     checklist_not_confirmed: "禁止事項に当たらないことを確認して、チェックを入れてください。",
     survey_limit: "追加設問は2問までです。追加するには、既存の設問を取り下げてください。",
+    last_client_admin: "有効なクライアント管理者が1人もいなくなるため、変更できません。",
+    report_not_available: "準備中のクライアントには、レポートを作成できません。",
+    not_client_admin: "このアカウントでは、クライアント管理サイトを利用できません。",
     survey_retired: "この設問はすでに取り下げられています。",
   };
   if (message && map[message]) return map[message];
   if (typeof message === "string" && message.startsWith("invalid_")) return "入力内容が正しくありません。";
   return "処理に失敗しました。時間をおいて再度お試しください。";
+}
+
+// 四半期の表示（例：2026-07-01 → 2026年7〜9月）
+export function quarterLabel(start: string): string {
+  const [y, m] = start.split("-").map(Number);
+  return `${y}年${m}〜${m + 2}月`;
 }

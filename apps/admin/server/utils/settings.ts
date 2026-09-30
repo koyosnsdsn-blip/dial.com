@@ -12,6 +12,9 @@ export const SETTING_DEFS: SettingDef[] = [
   { key: "frequent_cases", label: "「利用が頻繁」とする相談件数", unit: "件", def: 5, min: 2, max: 100, note: "判定期間内にこの件数以上でフラグを付ける。利用は止めない" },
   { key: "repeated_adjustments", label: "往復回数の調整の繰り返しとする回数", unit: "回", def: 3, min: 2, max: 50, note: "1件の相談でこの回数以上の調整があるとフラグを付ける（未決事項 No.69）" },
   { key: "busy_threshold", label: "稼働逼迫アラートを出す未返信件数", unit: "件", def: 20, min: 1, max: 10000, note: "未返信の相談がこの件数以上になると、ダッシュボードに警告を出す（要件 7.1、未決事項 No.20）" },
+  { key: "report_min_total", label: "四半期レポートで内訳を出す最小の相談件数", unit: "件", def: 10, min: 10, max: 1000, note: "企業契約型が対象。総件数がこれ未満の四半期は、件数だけを出し、内訳は出さない（要件 7.6.3）。10件より小さくはできない。変更は、次に作成するレポートから適用" },
+  { key: "report_min_genre", label: "四半期レポートでジャンルを個別に出す最小の件数", unit: "件", def: 5, min: 5, max: 1000, note: "企業契約型が対象。これ未満のジャンルは「その他」に合算する（要件 7.6.3）。5件より小さくはできない" },
+  { key: "small_client_members", label: "相談に関する数値を出さない従業員数の上限", unit: "人未満", def: 30, min: 1, max: 100000, note: "契約上の従業員数がこの人数未満の企業契約型クライアントには、四半期レポートで相談に関する数値を出さない（要件 7.6.4、【仮】30人）" },
 ];
 
 export type Settings = Record<string, number>;
