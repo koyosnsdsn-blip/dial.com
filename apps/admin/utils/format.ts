@@ -85,6 +85,8 @@ export function apiErrorMessage(e: any): string {
     handover_to_required: "担当中の案件があるため、引継ぎ先を選んでください。",
     invalid_handover: "引継ぎ先に選んだ相談員は有効ではありません。",
     invalid_date: "日付が正しくありません（開始と終了の順序・入力もれを確認してください）。",
+    range_too_long: "期間が長すぎます。1年以内で指定してください。",
+    too_many_rows: "件数が多すぎます（5000件まで）。期間を短くしてください。",
     type_not_confirmed: "契約類型の確認にチェックを入れてください。登録後は変更できません。",
     features_required: "機能をすべて無効にすることはできません。",
     approved_by_required: "この設定には体制側の承認が必要です。承認者を入力してください。",

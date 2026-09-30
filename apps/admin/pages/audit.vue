@@ -42,6 +42,8 @@ const ACTIONS: Record<string, { label: string; important?: boolean }> = {
   "account.lookup": { label: "利用者アカウントの照会", important: true },
   "account.posting.suspend": { label: "投稿機能の停止", important: true },
   "account.posting.resume": { label: "投稿機能の停止解除", important: true },
+  "export.cases": { label: "CSV出力：案件明細", important: true },
+  "export.survey": { label: "CSV出力：アンケート回答明細", important: true },
   "case.close.idle": { label: "無操作による自動終了（システム）" },
   "account.signup": { label: "利用者の新規登録（システム）" },
   "account.signup.code_failed": { label: "登録時の招待コード誤り（システム）" },
