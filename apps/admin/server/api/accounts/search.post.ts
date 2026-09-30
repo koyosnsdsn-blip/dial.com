@@ -1,13 +1,17 @@
 // 利用者アカウントの照会（要件 7.12.2）。運営管理者のみ。
-// - 検索はメールアドレスの完全一致のみ。部分一致・氏名での検索は提供しない
+// - 検索はニックネーム（またはメールアドレス）の完全一致のみ。部分一致・氏名での検索は提供しない
 //   （無関係な利用者の一覧を表示させる手段になるため。氏名はそもそも保持していない）
 // - 相談内容・相談サマリは返さない。件数だけを返す
 // - メールアドレスを URL やアクセスログに残さないよう、POST の本文で受け取る。監査ログにも検索語は残さない
 export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event, { adminOnly: true });
   const body = await readBody<{ email?: unknown }>(event);
-  const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+  const input = typeof body?.email === "string" ? body.email.trim() : "";
+  if (input.length === 0 || input.length > 254) throw createError({ statusCode: 400, statusMessage: "invalid_email" });
+  // 「@」を含まない入力はニックネームとして扱い、登録時と同じ計算で内部用の識別子に直して照合する
+  const byNickname = !input.includes("@");
+  const email = byNickname ? nicknameToEmail(input) : input.toLowerCase();
+  if (!byNickname && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw createError({ statusCode: 400, statusMessage: "invalid_email" });
   }
 
@@ -38,7 +42,9 @@ export default defineEventHandler(async (event) => {
     found: true as const,
     account: {
       accountId: a.account_id as string,
-      email: a.email as string | null,
+      // ニックネームで登録した利用者は、内部用の識別子ではなく、照会に使ったニックネームを表示する
+      email: isNicknameEmail(a.email) ? null : (a.email as string | null),
+      nickname: isNicknameEmail(a.email) ? (byNickname ? input.normalize("NFKC").trim().toLowerCase() : "（ニックネームで登録）") : null,
       tier: a.tier as "free" | "paid" | "member",
       clientName: a.client_id ? names.get(a.client_id) ?? null : null,
       postingSuspended: a.posting_suspended as boolean,

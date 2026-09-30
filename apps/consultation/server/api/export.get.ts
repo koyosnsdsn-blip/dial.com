@@ -1,3 +1,4 @@
+import { isNicknameEmail } from "../../utils/nickname";
 // 自身のデータの出力（要件 10.3.4）。利用者本人が、自分に関するデータをまとめて受け取る。
 // - 対象：登録情報、属性の回答、相談の一覧・やり取りの全文・アンケートの回答
 // - 相談員の氏名・識別子は含めない（3.6.1）。往復の回数・案件の通番も含めない
@@ -60,7 +61,9 @@ export default defineEventHandler(async (event) => {
   setHeader(event, "Cache-Control", "no-store");
   return {
     出力日時: new Date().toISOString(),
-    登録情報: { メールアドレス: own?.email ?? account.email, 登録日時: own?.created_at ?? null },
+    登録情報: isNicknameEmail(own?.email ?? account.email)
+      ? { ニックネーム: account.nickname, 登録日時: own?.created_at ?? null }
+      : { メールアドレス: own?.email ?? account.email, 登録日時: own?.created_at ?? null },
     属性の回答: (attrRows ?? []).map((a: any) => ({
       設問: a.question_text_snapshot,
       回答: a.option_label_snapshot,

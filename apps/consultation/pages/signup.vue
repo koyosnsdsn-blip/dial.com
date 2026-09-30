@@ -1,18 +1,28 @@
 <script setup lang="ts">
-// 新規登録（要件 8.4・8.5）。個人のメールアドレスとパスワードだけで登録する。氏名・所属は聞かない（3.10.5）。
-// 登録後、確認メールのリンクを開くとログインできるようになる。招待コードはログイン後に入力する。
+// 新規登録：ニックネームとパスワードだけで登録する。メールアドレス・氏名・所属は聞かない。
+// 招待コードをお持ちの場合は、ここで一緒に入力できる（あとからでも入力できる）。
+// 【2026-09-30 仕様変更】メールアドレスを使わない方式（要件 8.4 からの変更。未決事項一覧 2.12）
 // 【仮】利用規約・プライバシーポリシーへの同意の取得と版の記録（要件 10.8）は、文書が未整備のため未実装
 const supabase = useSupabaseClient();
 
-const email = ref("");
+const nickname = ref("");
 const password = ref("");
 const password2 = ref("");
+const inviteCode = ref("");
 const busy = ref(false);
-const sent = ref(false);
 const errorMessage = ref("");
 
 async function submit() {
   errorMessage.value = "";
+  const problem = nicknameProblem(nickname.value);
+  if (problem === "length") {
+    errorMessage.value = "ニックネームは2〜20文字で入力してください。";
+    return;
+  }
+  if (problem === "chars") {
+    errorMessage.value = "ニックネームに、空白や「@」は使えません。";
+    return;
+  }
   if (password.value.length < 8) {
     errorMessage.value = "パスワードは8文字以上にしてください。";
     return;
@@ -22,52 +32,55 @@ async function submit() {
     return;
   }
   busy.value = true;
-  const { error } = await supabase.auth.signUp({
-    email: email.value.trim(),
-    password: password.value,
-    options: { emailRedirectTo: `${window.location.origin}/confirm` },
-  });
-  busy.value = false;
-  if (error) {
-    if (error.status === 429) {
-      errorMessage.value = "ただいま確認メールを送信できません。しばらく時間をおいてから、もう一度お試しください。";
-    } else if (error.code === "weak_password") {
-      errorMessage.value = "このパスワードは使えません。別のパスワードにしてください。";
-    } else {
-      errorMessage.value = "登録できませんでした。入力内容をお確かめください。";
+  try {
+    await $fetch<unknown>("/api/signup", { method: "POST", body: { nickname: nickname.value, password: password.value } });
+    const { error } = await supabase.auth.signInWithPassword({ email: await nicknameToEmail(nickname.value), password: password.value });
+    if (error) {
+      errorMessage.value = "登録は完了しました。ログイン画面から、ニックネームとパスワードでログインしてください。";
+      return;
     }
-    return;
+    password.value = "";
+    password2.value = "";
+    // 招待コードは、入力があれば続けて登録する。うまくいかなくても登録自体は完了しているので、入力画面へ案内する
+    if (inviteCode.value.trim()) {
+      try {
+        await $fetch<unknown>("/api/invite", { method: "POST", body: { code: inviteCode.value } });
+      } catch {
+        await navigateTo("/invite");
+        return;
+      }
+    }
+    await navigateTo("/consult");
+  } catch (e: any) {
+    errorMessage.value = apiErrorMessage(e);
+  } finally {
+    busy.value = false;
   }
-  // すでに登録済みのアドレスでも同じ表示にする（登録の有無を第三者に推測させない）
-  password.value = "";
-  password2.value = "";
-  sent.value = true;
 }
 </script>
 
 <template>
   <main class="page narrow">
     <h1>新規登録</h1>
-    <div v-if="sent" class="card">
-      <p><strong>確認メールをお送りしました。</strong></p>
-      <p>メールに記載のリンクを開くと、登録が完了します。届かない場合は、迷惑メールのフォルダもご確認ください。</p>
-      <NuxtLink class="button secondary" to="/login">ログイン画面へ</NuxtLink>
-    </div>
-    <form v-else class="card" @submit.prevent="submit">
-      <p class="notice">
-        ご自身の<strong>個人のメールアドレス</strong>で登録してください。勤務先のアドレスは使わないでください。
-        お知らせのメールが届きますので、ご自身だけが見られるアドレスをおすすめします。
-      </p>
-      <label class="field" for="email">メールアドレス</label>
-      <input id="email" v-model="email" type="email" autocomplete="email" required />
+    <form class="card" @submit.prevent="submit">
+      <p class="note">メールアドレスやお名前の入力は必要ありません。</p>
+      <label class="field" for="nickname">ニックネーム（2〜20文字）</label>
+      <input id="nickname" v-model="nickname" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="20" required />
+      <p class="note">ログインのときに使います。本名や、ご自身が特定される名前は使わないでください。</p>
       <label class="field" for="pw">パスワード（8文字以上）</label>
-      <input id="pw" v-model="password" type="password" autocomplete="new-password" minlength="8" required />
+      <input id="pw" v-model="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required />
       <label class="field" for="pw2">パスワード（確認）</label>
-      <input id="pw2" v-model="password2" type="password" autocomplete="new-password" minlength="8" required />
+      <input id="pw2" v-model="password2" type="password" autocomplete="new-password" minlength="8" maxlength="72" required />
+      <p class="notice warn" style="margin-top: 14px">
+        <strong>ニックネームとパスワードは、忘れないように控えておいてください。</strong>
+        メールアドレスを登録しないため、忘れた場合に再設定ができません。
+      </p>
+      <label class="field" for="code">招待コード（お持ちの方のみ）</label>
+      <input id="code" v-model="inviteCode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" />
       <p v-if="errorMessage" class="error" role="alert" style="margin-top: 12px">{{ errorMessage }}</p>
-      <button type="submit" :disabled="busy" style="margin-top: 20px">{{ busy ? "送信中…" : "登録する" }}</button>
-      <p class="note" style="margin-top: 12px">お名前やご所属の入力は必要ありません。</p>
+      <button type="submit" :disabled="busy" style="margin-top: 20px">{{ busy ? "登録しています…" : "登録してはじめる" }}</button>
     </form>
     <p class="note">すでに登録済みの方は <NuxtLink to="/login">ログイン</NuxtLink></p>
+    <EmergencyLink />
   </main>
 </template>

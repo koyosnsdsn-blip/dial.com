@@ -4,6 +4,7 @@
 type Account = {
   accountId: string;
   email: string | null;
+  nickname: string | null;
   tier: "free" | "paid" | "member";
   clientName: string | null;
   postingSuspended: boolean;
@@ -62,23 +63,23 @@ async function setSuspended(next: boolean) {
     <main class="page">
       <h1>利用者アカウントの照会</h1>
       <form class="panel" @submit.prevent="search">
-        <label for="email">メールアドレス（完全一致）</label>
+        <label for="email">ニックネーム または メールアドレス（完全一致）</label>
         <div class="row">
-          <input id="email" v-model="email" type="email" autocomplete="off" required />
+          <input id="email" v-model="email" type="text" autocomplete="off" required />
           <button type="submit" :disabled="searching || !email">{{ searching ? "検索中…" : "照会する" }}</button>
         </div>
         <p class="note">
           お名前での検索・一部分での検索はできません（利用者のお名前は保持していません）。照会したことは監査ログに記録されます。<br />
-          本人確認：措置や退会の申し出は、ご本人がログインした状態での操作、または登録済みのアドレスからのメールを原則とします。
+          本人確認：措置や退会の申し出は、ご本人がログインした状態での操作を原則とします（ニックネームでの登録では、メールによる確認はできません）。
         </p>
       </form>
 
       <p v-if="message" class="ok" role="status">{{ message }}</p>
       <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
-      <p v-if="searched && !account && !errorMessage" class="note">このメールアドレスのアカウントは見つかりませんでした。</p>
+      <p v-if="searched && !account && !errorMessage" class="note">該当するアカウントは見つかりませんでした。</p>
 
       <section v-if="account" class="panel">
-        <h2>{{ account.email }}</h2>
+        <h2>{{ account.nickname ?? account.email }}</h2>
         <dl class="meta">
           <dt>会員区分</dt><dd>{{ tierLabel[account.tier] }}<span v-if="account.deleted" class="badge muted">退会済み</span></dd>
           <dt>所属クライアント</dt><dd>{{ account.clientName ?? "—" }}</dd>

@@ -132,9 +132,10 @@ function currentOptionId(item: AttrItem): string {
 
         <section class="card stack">
           <h2>アカウント</h2>
-          <p class="note">メールアドレス：{{ me?.email ?? "—" }}</p>
+          <p v-if="me?.nickname" class="note">ニックネーム：{{ me.nickname }}</p>
+          <p v-else class="note">メールアドレス：{{ me?.email ?? "—" }}</p>
           <NuxtLink v-if="me && !me.linked" class="button secondary" to="/invite">招待コードを入力する</NuxtLink>
-          <NuxtLink class="button secondary" to="/mypage/email">メールアドレスを変更する</NuxtLink>
+          <NuxtLink v-if="me && !me.nickname" class="button secondary" to="/mypage/email">メールアドレスを変更する</NuxtLink>
           <NuxtLink class="button secondary" to="/update-password">パスワードを変更する</NuxtLink>
           <button type="button" class="secondary" @click="signOut">ログアウト</button>
         </section>

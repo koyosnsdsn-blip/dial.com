@@ -2,6 +2,7 @@
 // 判定の正本はサーバー側（server/utils/auth.ts）。ここは表示と画面遷移の判断に使うだけ。
 export type Me = {
   email: string | null;
+  nickname: string | null;
   linked: boolean;
   canConsult: boolean;
   contractType: "corp" | "muni" | null;

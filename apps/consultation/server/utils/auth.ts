@@ -11,6 +11,8 @@ import { serverSupabaseUser } from "#supabase/server";
 export type AccountContext = {
   userId: string;
   email: string | null;
+  // ニックネームで登録した利用者のニックネーム（メールアドレスで登録した利用者は null）
+  nickname: string | null;
   tier: "free" | "paid" | "member";
   clientId: string | null;
 };
@@ -72,7 +74,9 @@ export async function requireAccount(event: H3Event): Promise<AccountContext> {
   if (data.deleted_at) {
     throw createError({ statusCode: 403, statusMessage: "account_deleted" });
   }
-  return { userId, email: data.email, tier: data.tier, clientId: data.client_id };
+  const meta = (claims.user_metadata ?? {}) as Record<string, unknown>;
+  const nickname = typeof meta.nickname === "string" ? meta.nickname : null;
+  return { userId, email: data.email, nickname, tier: data.tier, clientId: data.client_id };
 }
 
 export type Membership = {
