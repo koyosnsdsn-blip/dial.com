@@ -1,0 +1,41 @@
+# Node
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# Nuxt
+.nuxt/
+.output/
+.data/
+dist/
+
+# 環境変数（SUPABASE_SERVICE_ROLE_KEYを含む。最重要）
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel
+
+# Supabase CLI（ローカル開発の一時ファイル。config.tomlとmigrationsはコミットする）
+supabase/.branches
+supabase/.temp
+
+# TypeScript
+*.tsbuildinfo
+
+# テスト・カバレッジ
+coverage/
+
+# ログ
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# エディタ
+.vscode/*
+!.vscode/extensions.json
+.idea/

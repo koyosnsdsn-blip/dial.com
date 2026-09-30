@@ -1,0 +1,19 @@
+{
+  "name": "dial-com",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:consultation": "pnpm --filter consultation dev",
+    "dev:admin": "pnpm --filter admin dev",
+    "build:consultation": "pnpm --filter consultation build",
+    "build:admin": "pnpm --filter admin build",
+    "typecheck": "pnpm -r typecheck",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:migrate:new": "supabase migration new"
+  }
+}
