@@ -28,6 +28,7 @@ export default defineNuxtConfig({
   // 相談内容がサーバー生成のHTMLやそのキャッシュに混入する経路をなくすため（管理側アプリと同じ考え方）。
   // 公開ページ（トップ・緊急時の案内）だけサーバー側で生成する。緊急時の案内はJavaScriptが動かなくても読める
   routeRules: {
+    "/start/**": { ssr: false },
     "/login": { ssr: false },
     "/signup": { ssr: false },
     "/confirm": { ssr: false },

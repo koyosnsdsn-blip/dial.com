@@ -4,8 +4,9 @@
 //
 // ここは画面遷移のためのガードであり、データを守る最終防衛線ではない。
 // サーバーAPIは server/utils/auth.ts の requireAccount() で、DBはRLSで、それぞれ独立に検査する。
-const PUBLIC = ["/", "/emergency", "/login", "/signup", "/confirm", "/forgot"];
-const GUEST_ONLY = ["/login", "/signup"];
+const PUBLIC = ["/", "/emergency", "/login", "/signup", "/confirm", "/forgot", "/start/invite", "/start/nickname", "/start/email"];
+// ログイン済みなら、入口ではなく相談の画面へ進める
+const GUEST_ONLY = ["/login", "/signup", "/start/invite", "/start/nickname", "/start/email"];
 
 export default defineNuxtRouteMiddleware(async (to) => {
   // 公開ページのうちサーバー側で生成するもの（トップ・緊急時の案内）は、判定せずに表示する
@@ -19,5 +20,5 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return signedIn ? navigateTo("/consult") : undefined;
   }
   if (PUBLIC.includes(to.path)) return;
-  if (!signedIn) return navigateTo("/login");
+  if (!signedIn) return navigateTo("/");
 });

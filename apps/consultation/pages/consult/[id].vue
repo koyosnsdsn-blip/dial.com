@@ -47,7 +47,7 @@ async function load(scroll = false) {
   } catch (e: any) {
     const status = e?.statusCode ?? e?.response?.status;
     if (status === 401) {
-      await navigateTo("/login");
+      await navigateTo("/");
       return;
     }
     errorMessage.value = apiErrorMessage(e);

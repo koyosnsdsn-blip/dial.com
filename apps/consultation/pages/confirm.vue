@@ -27,7 +27,7 @@ onMounted(async () => {
       <template v-else>
         <p><strong>メールアドレスを確認しました。</strong></p>
         <p>ログインしてご利用ください。ログインできない場合は、リンクの有効期限が切れている可能性があります。</p>
-        <NuxtLink class="button" to="/login">ログイン画面へ</NuxtLink>
+        <NuxtLink class="button" :to="{ path: '/start/email', query: { tab: 'login' } }">ログインへ</NuxtLink>
       </template>
     </div>
   </main>

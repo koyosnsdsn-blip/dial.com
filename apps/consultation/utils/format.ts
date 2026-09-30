@@ -47,7 +47,7 @@ export function apiErrorMessage(e: any): string {
   const map: Record<string, string> = {
     service_key_not_configured: "ただいま準備中のため、この機能はご利用いただけません。（サーバーの設定が完了していません）",
     audit_log_failed: "処理を完了できませんでした。時間をおいて、もう一度お試しください。",
-    signed_out: "ログインの有効期限が切れました。もう一度ログインしてください。",
+    signed_out: "ログインの有効期限が切れました。入口からもう一度ログインしてください。",
     invalid_code: "招待コードを確認できませんでした。入力内容をお確かめください。",
     too_many_attempts: "試行回数が上限に達しました。1時間ほどおいてから、もう一度お試しください。",
     not_eligible: "現在、ご相談を開始できません。招待コードの登録状況をご確認ください。",
