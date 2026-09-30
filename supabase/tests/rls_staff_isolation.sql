@@ -11,7 +11,7 @@
 --   T7 ログイン済みでも相談内容系テーブルへ直接 INSERT / UPDATE できない（書き込みはサーバールート経由のみ）
 --   T8 サーバーAPI用の service_role は全案件を読め、監査ログへ書き込める
 --
--- 最終実行：2026-09-30 dev（dial-dot-com-dev）で T1〜T8 すべて合格（user_case_visibility 適用後）
+-- 最終実行：2026-09-30 dev（dial.com-dev）で T1〜T8 すべて合格（user_case_visibility 適用後）
 --
 -- 実行方法：このファイル全体をそのまま実行する（Supabase の SQL Editor、または MCP の execute_sql）。
 -- 最後に必ず例外を投げてトランザクションごと取り消すため、テストデータは DB に残らない。
