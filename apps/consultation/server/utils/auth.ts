@@ -26,6 +26,20 @@ export async function requireAccount(event: H3Event): Promise<AccountContext> {
     throw createError({ statusCode: 401, statusMessage: "signed_out" });
   }
   const userId = claims.sub as string;
+
+  // 運営側（相談員・運営管理者）のアカウントでは、相談者側を利用できないようにする。
+  // 運営側のアカウントは、多要素認証を通過したセッションでしか相談内容を読めない（DBの制約）。
+  // 相談者側のログインは多要素認証を求めないため、そのまま使うと自分の送ったメッセージも表示されない状態になる。
+  // 【仮】利用者としての相談が必要な場合は、別のメールアドレスで登録してもらう
+  const { data: staffRow, error: staffError } = await serviceDb(event)
+    .from("counselors")
+    .select("counselor_id")
+    .eq("counselor_id", userId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (staffError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+  if (staffRow) throw createError({ statusCode: 403, statusMessage: "staff_account" });
+
   const db = await userDb(event);
 
   const read = () =>

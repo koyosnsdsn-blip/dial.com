@@ -59,6 +59,7 @@ export function apiErrorMessage(e: any): string {
     empty_body: "メッセージを入力してください。",
     body_too_long: "メッセージは5000文字以内で入力してください。",
     export_limit: "データの出力は、24時間に3回までです。時間をおいて、もう一度お試しください。",
+    staff_account: "このメールアドレスは運営側（管理画面）のアカウントです。相談者側を使うときは、別のメールアドレスで登録してください。",
     account_deleted: "このアカウントはご利用いただけません。",
   };
   if (message && map[message]) return map[message];
