@@ -35,11 +35,14 @@ export default defineEventHandler(async (event) => {
   // 閲覧権限を確認できた案件についてのみ、service role で補足情報を読む
   const sdb = serviceDb(event);
   const limits = (await caseLimits(event, [caseId])).get(caseId);
-  const [restart, names, frequent, deleted] = await Promise.all([
-    quickRestartFlags(event, [{ case_id: caseId, account_id: r.account_id, opened_at: r.opened_at }]),
+  const settings = await getSettings(event);
+  const [restart, names, frequent, deleted, { data: draft }] = await Promise.all([
+    quickRestartFlags(event, [{ case_id: caseId, account_id: r.account_id, opened_at: r.opened_at }], settings.quick_restart_days!),
     clientNames(event, [r.client_id]),
-    frequentUseFlags(event, [{ case_id: caseId, account_id: r.account_id }]),
+    frequentUseFlags(event, [{ case_id: caseId, account_id: r.account_id }], settings.frequent_days!, settings.frequent_cases!),
     deletedCases(event, [caseId]),
+    // 自分の返信の下書き（要件 7.3）
+    sdb.from("reply_drafts").select("body, updated_at").eq("case_id", caseId).eq("counselor_id", staff.userId).maybeSingle(),
   ]);
   const [{ data: adjustments }, { count: seq }] = await Promise.all([
     sdb.from("rally_adjustments").select("delta, reason, adjusted_at, counselor:counselors(name)").eq("case_id", caseId).order("adjusted_at", { ascending: false }),
@@ -54,12 +57,13 @@ export default defineEventHandler(async (event) => {
     seq: seq ?? 1,
     // 前回の終了から短期間での再開か（支援の要否を判断するための情報。要件 3.4.2）
     quickRestart: restart.has(caseId),
-    quickRestartDays: QUICK_RESTART_DAYS,
+    quickRestartDays: settings.quick_restart_days!,
     clientName: r.client_id ? names.get(r.client_id) ?? null : null,
     // 異常利用の検知（確認の契機。利用の抑止には使わない）
     frequentUse: frequent.has(caseId),
-    frequentNote: `${FREQUENT_DAYS}日以内に${FREQUENT_CASES}件以上`,
-    repeatedAdjustments: (adjustments ?? []).length >= REPEATED_ADJUSTMENTS,
+    frequentNote: `${settings.frequent_days}日以内に${settings.frequent_cases}件以上`,
+    repeatedAdjustments: (adjustments ?? []).length >= settings.repeated_adjustments!,
+    draft: (draft?.body as string | undefined) ?? "",
     // 利用者が削除した案件（やり取りは非表示化済み。物理削除の予定日時まで保持）
     deletedByUser: deleted.get(caseId) ?? null,
     status: r.status as "open" | "closed",

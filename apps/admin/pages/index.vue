@@ -36,9 +36,19 @@ const now = ref(Date.now());
 const filters = reactive({ status: "open", assignee: "all", kind: "all", urgent: false, client: "", from: "", to: "" });
 const clientOptions = ref<ClientOption[]>([]);
 
-const urgentCount = computed(() => cases.value.filter((c) => c.urgent && c.status === "open").length);
-const awaitingCount = computed(() => cases.value.filter((c) => c.status === "open" && c.awaitingReplySince).length);
-const unassignedCount = computed(() => cases.value.filter((c) => c.status === "open" && !c.assigneeName && !c.mine).length);
+// 件数は、絞り込みに関係なく全体の状況を表示する（/api/dashboard-summary）
+type Summary = { awaiting: number; urgent: number; unassigned: number; busy: boolean; busyThreshold: number; inquiries: number; deletionFailed: number; deletionPending: number };
+const summary = ref<Summary | null>(null);
+const urgentCount = computed(() => summary.value?.urgent ?? cases.value.filter((c) => c.urgent && c.status === "open").length);
+const awaitingCount = computed(() => summary.value?.awaiting ?? 0);
+const unassignedCount = computed(() => summary.value?.unassigned ?? 0);
+async function loadSummary() {
+  try {
+    summary.value = await $fetch<Summary>("/api/dashboard-summary");
+  } catch {
+    /* 一覧の表示は続ける */
+  }
+}
 
 async function load() {
   try {
@@ -55,6 +65,7 @@ async function load() {
     if (becameUrgent.length > 0) alertUrgent();
     cases.value = next;
     errorMessage.value = "";
+    loadSummary();
   } catch (e: any) {
     errorMessage.value = apiErrorMessage(e);
   } finally {
@@ -125,10 +136,16 @@ watch(filters, load);
         緊急案件が {{ urgentCount }} 件あります。最上位から対応してください。
       </div>
 
+      <div v-if="summary?.busy" class="busy-banner" role="status">
+        未返信の相談が {{ summary.awaiting }} 件あります（目安 {{ summary.busyThreshold }} 件以上）。応援体制を検討してください。相談の受付は止めません。
+      </div>
+
       <div class="summary">
         <div class="tile"><span class="num">{{ awaitingCount }}</span><span class="label">返信待ち</span></div>
         <div class="tile"><span class="num">{{ urgentCount }}</span><span class="label">緊急</span></div>
         <div v-if="staff?.role === 'admin'" class="tile"><span class="num">{{ unassignedCount }}</span><span class="label">未割当</span></div>
+        <NuxtLink v-if="staff?.role === 'admin' && summary && summary.inquiries > 0" to="/inquiries" class="tile link"><span class="num">{{ summary.inquiries }}</span><span class="label">未対応の問い合わせ</span></NuxtLink>
+        <NuxtLink v-if="staff?.role === 'admin' && summary && summary.deletionFailed > 0" to="/deletions" class="tile link alert"><span class="num">{{ summary.deletionFailed }}</span><span class="label">削除の失敗</span></NuxtLink>
       </div>
 
       <div class="filters">
@@ -221,6 +238,9 @@ watch(filters, load);
 .summary { display: flex; gap: 12px; margin: 8px 0 16px; }
 .tile { display: flex; flex-direction: column; min-width: 110px; padding: 12px 16px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
 .tile .num { font-size: 24px; font-weight: 700; }
+.tile.link { text-decoration: none; color: var(--fg); border-color: var(--accent); }
+.tile.alert { border-color: var(--danger); color: var(--danger); }
+.busy-banner { margin: 8px 0 16px; padding: 12px 16px; background: #fff8c5; color: #7d4e00; border-radius: 6px; font-weight: 600; }
 .tile .label { font-size: 13px; color: var(--muted); }
 .filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; margin-bottom: 12px; }
 .filters label { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }

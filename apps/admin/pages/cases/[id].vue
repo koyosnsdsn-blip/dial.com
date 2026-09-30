@@ -15,6 +15,7 @@ type CaseDetail = {
   frequentNote: string;
   repeatedAdjustments: boolean;
   deletedByUser: { requestedAt: string; purgeAfter: string | null } | null;
+  draft: string;
   status: "open" | "closed";
   closeReason: string | null;
   urgent: boolean;
@@ -49,6 +50,15 @@ const now = ref(Date.now());
 async function load() {
   try {
     detail.value = await $fetch<CaseDetail>(`/api/cases/${caseId.value}`);
+    // 保存済みの下書きは、最初に開いたときだけ入力欄に戻す（入力中の内容を上書きしない）
+    if (!draftLoaded) {
+      if (reply.value === "" && detail.value.draft) {
+        reply.value = detail.value.draft;
+        draftState.value = "saved";
+      }
+      await nextTick();
+      draftLoaded = true;
+    }
     errorMessage.value = "";
   } catch (e: any) {
     errorMessage.value = apiErrorMessage(e);
@@ -111,9 +121,54 @@ async function run(name: string, fn: () => Promise<unknown>) {
 
 // 返信
 const reply = ref("");
+
+// 返信テンプレート（要件 7.15）と下書きの自動保存（要件 7.3）
+type Template = { templateId: string; title: string; body: string };
+const templates = ref<Template[]>([]);
+const templatePick = ref("");
+function insertTemplate() {
+  const t = templates.value.find((x) => x.templateId === templatePick.value);
+  if (t) reply.value = reply.value.trim() === "" ? t.body : `${reply.value.replace(/\s+$/, "")}\n\n${t.body}`;
+  templatePick.value = "";
+}
+const draftState = ref<"" | "saving" | "saved" | "error">("");
+let draftLoaded = false;
+let draftTimer: ReturnType<typeof setTimeout> | null = null;
+async function saveDraft() {
+  if (!detail.value?.canOperate) return;
+  draftState.value = "saving";
+  try {
+    const res = await $fetch<{ saved: boolean }>(`/api/cases/${caseId.value}/draft`, { method: "PUT", body: { body: reply.value } });
+    draftState.value = res.saved ? "saved" : "";
+  } catch {
+    draftState.value = "error";
+  }
+}
+watch(reply, () => {
+  if (!draftLoaded) return;
+  if (draftTimer) clearTimeout(draftTimer);
+  draftTimer = setTimeout(saveDraft, 1500);
+});
+onMounted(async () => {
+  try {
+    templates.value = await $fetch<Template[]>("/api/reply-templates");
+  } catch {
+    templates.value = [];
+  }
+});
+onBeforeUnmount(() => {
+  if (draftTimer) clearTimeout(draftTimer);
+});
 async function sendReply() {
   const ok = await run("reply", () => $fetch<unknown>(`/api/cases/${caseId.value}/messages`, { method: "POST", body: { body: reply.value } }));
-  if (ok) reply.value = "";
+  if (ok) {
+    if (draftTimer) clearTimeout(draftTimer);
+    draftLoaded = false;
+    reply.value = "";
+    draftState.value = "";
+    await nextTick();
+    draftLoaded = true;
+  }
 }
 
 // 緊急フラグ
@@ -255,10 +310,19 @@ onBeforeUnmount(() => clock && clearInterval(clock));
             </ol>
 
             <form v-if="detail.canOperate" class="reply" @submit.prevent="sendReply">
-              <label for="reply">返信</label>
+              <div class="reply-head">
+                <label for="reply">返信</label>
+                <select v-if="templates.length" v-model="templatePick" aria-label="テンプレートを挿入" @change="insertTemplate">
+                  <option value="">テンプレートを挿入…</option>
+                  <option v-for="t in templates" :key="t.templateId" :value="t.templateId">{{ t.title }}</option>
+                </select>
+              </div>
               <textarea id="reply" v-model="reply" rows="5" maxlength="5000" placeholder="相談者への返信を入力（本文中で氏名を名乗らないでください）" />
               <p class="note">
                 送信すると往復回数を1回使います（残り {{ remaining }} 回）。<span v-if="remaining === 1"><b>この返信で上限に達し、案件は終了します。</b></span>
+              </p>
+              <p class="draft-state" aria-live="polite">
+                {{ draftState === "saving" ? "下書きを保存しています…" : draftState === "saved" ? "下書きを保存しました" : draftState === "error" ? "下書きを保存できませんでした" : "" }}
               </p>
               <button type="submit" :disabled="busy !== '' || reply.trim() === ''">{{ busy === "reply" ? "送信中…" : "返信を送信" }}</button>
             </form>
@@ -393,6 +457,9 @@ select, textarea { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px 
 .messages .who { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .messages .body { white-space: pre-wrap; line-height: 1.7; }
 .reply { border-top: 1px solid var(--line); padding-top: 12px; }
+.reply-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.reply-head select { width: auto; max-width: 60%; padding: 4px 8px; font-size: 13px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.draft-state { min-height: 1.2em; margin: 4px 0 0; font-size: 12px; color: var(--muted); }
 .confirm { margin-top: 10px; padding: 10px 12px; background: #fff8c5; border-radius: 6px; font-size: 14px; }
 .history { list-style: none; padding: 0; margin: 12px 0 0; font-size: 13px; display: flex; flex-direction: column; gap: 8px; }
 .history li { padding-top: 8px; border-top: 1px dashed var(--line); }

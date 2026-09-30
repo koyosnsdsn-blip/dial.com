@@ -70,8 +70,7 @@ export async function caseLimits(event: H3Event, caseIds: string[]): Promise<Map
 // 【仮】判定は選択肢のラベルで行う（設問・選択肢が未確定のため：未決事項 No.38）
 export const HURRY_ANSWER = "すぐに話したい";
 
-// 短期間の再開とみなす日数（要件 3.4.2）。【仮】期間は未決（未決事項 No.70）のため暫定で7日
-export const QUICK_RESTART_DAYS = 7;
+// 短期間の再開・異常利用の判定に使う日数や件数は、サービス全体設定（server/utils/settings.ts）から読む
 
 // 前回の終了から短期間で開始された案件か。支援の要否を判断するための情報であり、利用の抑止には使わない（3.4.2）。
 // 同じ相談者の他の案件（担当外を含む）の終了日時が必要なため service role で読む。返すのは真偽値だけ。
@@ -79,6 +78,7 @@ export const QUICK_RESTART_DAYS = 7;
 export async function quickRestartFlags(
   event: H3Event,
   rows: { case_id: string; account_id: string; opened_at: string }[],
+  quickRestartDays: number,
 ): Promise<Set<string>> {
   const flagged = new Set<string>();
   const accountIds = [...new Set(rows.map((r) => r.account_id))];
@@ -95,7 +95,7 @@ export async function quickRestartFlags(
     list.push(new Date(c.closed_at as string).getTime());
     closedByAccount.set(c.account_id, list);
   }
-  const windowMs = QUICK_RESTART_DAYS * 86400000;
+  const windowMs = quickRestartDays * 86400000;
   for (const r of rows) {
     const opened = new Date(r.opened_at).getTime();
     const hit = (closedByAccount.get(r.account_id) ?? []).some((closed) => closed <= opened && opened - closed <= windowMs);
@@ -105,21 +105,22 @@ export async function quickRestartFlags(
 }
 
 // 異常利用の検知（要件 3.2.3 ガードレール4）。自動的な利用停止は行わず、確認の契機としてフラグを出すだけ。
-// 【仮】閾値は未決（未決事項 No.19・No.69）のため暫定：同じ相談者が30日以内に5件以上の相談／1件の案件で往復の調整が3回以上
-export const FREQUENT_DAYS = 30;
-export const FREQUENT_CASES = 5;
-export const REPEATED_ADJUSTMENTS = 3;
-
-export async function frequentUseFlags(event: H3Event, rows: { case_id: string; account_id: string }[]): Promise<Set<string>> {
+// 閾値はサービス全体設定（frequent_days / frequent_cases / repeated_adjustments）
+export async function frequentUseFlags(
+  event: H3Event,
+  rows: { case_id: string; account_id: string }[],
+  frequentDays: number,
+  frequentCases: number,
+): Promise<Set<string>> {
   const flagged = new Set<string>();
   const accountIds = [...new Set(rows.map((r) => r.account_id))];
   if (accountIds.length === 0) return flagged;
-  const since = new Date(Date.now() - FREQUENT_DAYS * 86400000).toISOString();
+  const since = new Date(Date.now() - frequentDays * 86400000).toISOString();
   const { data, error } = await serviceDb(event).from("cases").select("account_id").in("account_id", accountIds).gte("opened_at", since);
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
   const count = new Map<string, number>();
   for (const c of data ?? []) count.set(c.account_id, (count.get(c.account_id) ?? 0) + 1);
-  for (const r of rows) if ((count.get(r.account_id) ?? 0) >= FREQUENT_CASES) flagged.add(r.case_id);
+  for (const r of rows) if ((count.get(r.account_id) ?? 0) >= frequentCases) flagged.add(r.case_id);
   return flagged;
 }
 

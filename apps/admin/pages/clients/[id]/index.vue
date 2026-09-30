@@ -23,6 +23,11 @@ type Detail = {
   members: number;
   openCases: number;
   totalCases: number;
+  monthCases: number;
+  monthUsers: number;
+  usageRate: number | null;
+  usageOver: boolean;
+  membersOver: boolean;
   counselorIds: string[];
   counselors: { counselorId: string; name: string; role: string; status: string }[];
 };
@@ -215,7 +220,10 @@ onMounted(load);
         <dl class="meta">
           <dt>登録件数</dt><dd>{{ detail.members }} 件<template v-if="detail.employeeCount">（契約上の従業員数 {{ detail.employeeCount }}）</template></dd>
           <dt>相談</dt><dd>対応中 {{ detail.openCases }} 件／累計 {{ detail.totalCases }} 件</dd>
+          <dt>今月の利用</dt><dd>{{ detail.monthCases }} 件／利用者 {{ detail.monthUsers }} 人<template v-if="detail.usageRate !== null">（利用率 {{ detail.usageRate }}%<template v-if="detail.assumedUsageRate !== null">／想定 {{ detail.assumedUsageRate }}%</template>）</template></dd>
         </dl>
+        <p v-if="detail.usageOver" class="warn">今月の利用率が、契約上の想定利用率を超えています。</p>
+        <p v-if="detail.membersOver" class="warn">登録件数が、契約上の従業員数を超えています。招待コードの流出や、1人による複数登録の可能性があります（自動での利用停止は行いません）。</p>
 
         <section v-if="detail.status === 'prep'" class="panel prep">
           <h2>「有効」に切り替える</h2>

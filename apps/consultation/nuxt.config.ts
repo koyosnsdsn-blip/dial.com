@@ -35,6 +35,7 @@ export default defineNuxtConfig({
     "/forgot": { ssr: false },
     "/update-password": { ssr: false },
     "/invite": { ssr: false },
+    "/contact": { ssr: false },
     "/consult/**": { ssr: false },
     "/consult": { ssr: false },
     "/mypage/**": { ssr: false },

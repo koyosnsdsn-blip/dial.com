@@ -17,5 +17,7 @@ export default defineEventHandler(async (event) => {
 
   const { data, error } = await serviceDb(event).rpc("staff_send_reply", { p_case_id: caseId, p_body: text });
   if (error) rpcError(error);
+  // 送信できたら、下書きを消す（失敗しても送信は完了しているので続行する）
+  await serviceDb(event).from("reply_drafts").delete().eq("case_id", caseId).eq("counselor_id", staff.userId);
   return data as { message_id: string; rally_used: number; rally_max: number; closed: boolean };
 });

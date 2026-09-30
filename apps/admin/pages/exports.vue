@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// データ出力（CSV。要件 7.9）。社内業務用の2種類。
+// データ出力（CSV。要件 7.9）。社内業務用の4種類。
 // 出力できる範囲：運営管理者は全案件、相談員は自分の担当案件のみ。出力の操作は監査ログに記録される。
-// 未実装：日次サマリ（7.9.3）、アンケート集計（7.9.5）、クライアント提出用（7.9.6。四半期レポートが未実装）
+// 未実装：クライアント提出用（7.9.6。四半期レポートが未実装）
 const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 const monthStart = `${today.slice(0, 8)}01`;
 const from = ref(monthStart);
@@ -9,7 +9,7 @@ const to = ref(today);
 const busy = ref("");
 const errorMessage = ref("");
 
-async function download(kind: "cases" | "survey") {
+async function download(kind: "cases" | "survey" | "daily" | "survey-summary") {
   busy.value = kind;
   errorMessage.value = "";
   try {
@@ -53,6 +53,18 @@ async function download(kind: "cases" | "survey") {
         <h2>アンケート回答明細</h2>
         <p class="note">案件ごとのアンケートの回答（属性・主訴）。「答えない」もそのまま出力します。利用者を識別する情報は含みません。<strong>この出力は、クライアントへ提出しないでください。</strong></p>
         <button type="button" :disabled="busy !== ''" @click="download('survey')">{{ busy === "survey" ? "作成中…" : "アンケート回答明細を出力する" }}</button>
+      </section>
+
+      <section class="panel">
+        <h2>日次サマリ</h2>
+        <p class="note">1日ごとの新規案件数、返信件数、完了件数、平均初回返信時間、SLA遵守率（暦時間での仮の判定）、緊急フラグの設定件数（運営管理者のみ）。</p>
+        <button type="button" :disabled="busy !== ''" @click="download('daily')">{{ busy === "daily" ? "作成中…" : "日次サマリを出力する" }}</button>
+      </section>
+
+      <section class="panel">
+        <h2>アンケート集計</h2>
+        <p class="note">設問・選択肢ごとの件数と構成比、「答えない」の選択率。<strong>この出力は、クライアントへ提出しないでください</strong>（少人数でも内訳が出るため）。</p>
+        <button type="button" :disabled="busy !== ''" @click="download('survey-summary')">{{ busy === "survey-summary" ? "作成中…" : "アンケート集計を出力する" }}</button>
       </section>
 
       <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>

@@ -9,10 +9,9 @@ const roleLabel = computed(() => (isAdmin.value ? "運営管理者" : "相談員
     <nav class="nav">
       <NuxtLink to="/" class="brand">ダイヤル.com 管理</NuxtLink>
       <NuxtLink to="/">ダッシュボード</NuxtLink>
-      <NuxtLink to="/exports">データ出力</NuxtLink>
       <NuxtLink v-if="isAdmin" to="/clients">契約クライアント</NuxtLink>
-      <NuxtLink v-if="isAdmin" to="/accounts">利用者</NuxtLink>
       <NuxtLink v-if="isAdmin" to="/staff">相談員の管理</NuxtLink>
+      <NuxtLink to="/ops">運営メニュー</NuxtLink>
       <NuxtLink v-if="isAdmin" to="/audit">監査ログ</NuxtLink>
     </nav>
     <div class="who">

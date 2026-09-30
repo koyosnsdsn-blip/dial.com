@@ -15,6 +15,15 @@ export default defineEventHandler(async (event) => {
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
   if (!r) throw createError({ statusCode: 404, statusMessage: "not_found" });
 
+  // 今月（日本時間）の利用状況：案件数、利用者数、利用率（利用者数 ÷ 契約上の従業員数）。要件 3.2.3 ガードレール2
+  const jst = new Date(Date.now() + 9 * 3600 * 1000);
+  const monthStart = `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, "0")}-01T00:00:00+09:00`;
+  const { data: monthCases, error: monthError } = await db.from("cases").select("account_id").eq("client_id", clientId).gte("opened_at", monthStart).limit(20000);
+  if (monthError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+  const monthUsers = new Set((monthCases ?? []).map((c: any) => c.account_id as string)).size;
+  const usageRate = r.employee_count ? Math.round((monthUsers / r.employee_count) * 10000) / 100 : null;
+  const assumed = r.assumed_usage_rate === null ? null : Math.round(Number(r.assumed_usage_rate) * 10000) / 100;
+
   await writeAudit(event, staff, { action: "client.view", targetType: "clients", targetId: clientId });
 
   return {
@@ -36,6 +45,13 @@ export default defineEventHandler(async (event) => {
     members: members ?? 0,
     openCases: openCases ?? 0,
     totalCases: totalCases ?? 0,
+    monthCases: (monthCases ?? []).length,
+    monthUsers,
+    usageRate,
+    // 想定利用率を超えているか（単価見直し条項の基準。企業契約型のみ）
+    usageOver: usageRate !== null && assumed !== null && usageRate > assumed,
+    // 登録件数が契約上の従業員数を超えているか（重複アカウントの検知の契機。要件 10.9）
+    membersOver: Boolean(r.employee_count && (members ?? 0) > r.employee_count),
     counselorIds: (limited ?? []).map((x: any) => x.counselor_id as string),
     counselors: (counselors ?? []).map((c: any) => ({
       counselorId: c.counselor_id as string,

@@ -59,10 +59,11 @@ export default defineEventHandler(async (event) => {
     if (ansError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
     for (const a of answers ?? []) hurry.add(a.case_id);
   }
+  const settings = await getSettings(event);
   const [restart, names, frequent, deleted] = await Promise.all([
-    quickRestartFlags(event, rows),
+    quickRestartFlags(event, rows, settings.quick_restart_days!),
     clientNames(event, rows.map((r) => r.client_id)),
-    frequentUseFlags(event, rows),
+    frequentUseFlags(event, rows, settings.frequent_days!, settings.frequent_cases!),
     deletedCases(event, ids),
   ]);
 

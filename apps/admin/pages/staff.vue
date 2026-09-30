@@ -15,6 +15,9 @@ type StaffRow = {
   absentNow: boolean;
   openCases: number;
   isSelf: boolean;
+  recentCases: number;
+  avgFirstReplyHours: number | null;
+  slaRate: number | null;
 };
 
 const rows = ref<StaffRow[]>([]);
@@ -108,7 +111,7 @@ onMounted(load);
       <div v-else class="table-wrap">
         <table class="staff">
           <thead>
-            <tr><th>氏名</th><th>権限</th><th>状態</th><th>メールアドレス</th><th>最終ログイン</th><th>対応中</th><th>不在</th><th></th></tr>
+            <tr><th>氏名</th><th>権限</th><th>状態</th><th>メールアドレス</th><th>最終ログイン</th><th>対応中</th><th title="直近30日に開始された担当案件">30日の担当</th><th title="最初の相談者メッセージから最初の返信まで">平均初回返信</th><th title="暦時間での仮の判定">SLA遵守</th><th>不在</th><th></th></tr>
           </thead>
           <tbody>
             <tr v-for="r in rows" :key="r.counselorId" :class="{ expired: r.status === 'expired' }">
@@ -122,6 +125,9 @@ onMounted(load);
               <td>{{ r.email ?? "—" }}</td>
               <td>{{ formatDateTime(r.lastSignInAt) }}</td>
               <td>{{ r.openCases }} 件</td>
+              <td>{{ r.recentCases }} 件</td>
+              <td>{{ r.avgFirstReplyHours === null ? "—" : `${r.avgFirstReplyHours}時間` }}</td>
+              <td>{{ r.slaRate === null ? "—" : `${r.slaRate}%` }}</td>
               <td>
                 <template v-if="r.absentFrom">{{ r.absentFrom }}〜{{ r.absentTo }}<span v-if="r.absentNow" class="badge waiting">不在中</span></template>
                 <template v-else>—</template>

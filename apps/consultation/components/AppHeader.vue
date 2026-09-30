@@ -3,6 +3,7 @@
 </script>
 
 <template>
+  <div>
   <header class="app-header">
     <NuxtLink to="/consult" class="brand">ダイヤル.com</NuxtLink>
     <nav>
@@ -10,6 +11,8 @@
       <NuxtLink to="/mypage">マイページ</NuxtLink>
     </nav>
   </header>
+  <NoticeBanner />
+  </div>
 </template>
 
 <style scoped>
