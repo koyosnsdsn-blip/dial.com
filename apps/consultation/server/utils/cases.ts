@@ -9,16 +9,17 @@ export type OwnCase = {
   opened_at: string;
   closed_at: string | null;
   client_id: string | null;
+  continuity: "same" | "changed" | null;
 };
 
-// 本人の案件であることを確認する。本人の権限（RLS）で読み、さらに account_id を明示して絞る（多層防御）。
+// 本人の案件であることを確認する。本人の権限で、ビュー my_cases（本人の行・見せてよい列のみ）から読む。
+// 担当者の識別子や往復の回数は、このビューに含まれない（要件 3.6.1・3.3.1）。
 // 他人の案件・存在しない案件はどちらも 404 とし、存在の有無を区別させない。
 export async function requireOwnCase(event: H3Event, account: AccountContext, caseId: string): Promise<OwnCase> {
   const { data, error } = await (await userDb(event))
-    .from("cases")
-    .select("case_id, status, close_reason, opened_at, closed_at, client_id")
+    .from("my_cases")
+    .select("case_id, status, close_reason, opened_at, closed_at, client_id, continuity")
     .eq("case_id", caseId)
-    .eq("account_id", account.userId)
     .maybeSingle();
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
   if (!data) throw createError({ statusCode: 404, statusMessage: "not_found" });

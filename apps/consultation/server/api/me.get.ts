@@ -5,10 +5,10 @@ export default defineEventHandler(async (event) => {
   const m = await membership(event, account);
 
   // 対応中の案件の有無（案件IDのみ。内容は返さないため監査ログの対象外）
+  // my_cases は本人の行だけを返すビュー（見せてよい列のみ）
   const { data: open, error } = await (await userDb(event))
-    .from("cases")
+    .from("my_cases")
     .select("case_id")
-    .eq("account_id", account.userId)
     .eq("status", "open")
     .maybeSingle();
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });

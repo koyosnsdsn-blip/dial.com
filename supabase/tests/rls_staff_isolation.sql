@@ -4,13 +4,14 @@
 --   T1 相談員A（MFA済）は自分の担当案件だけを読める。相談員Bの案件・メッセージは読めない
 --   T2 相談員A（MFA未通過＝aal1）は自分の担当案件すら読めない（staff_require_mfa）
 --   T3 運営管理者（MFA済）は全案件を読める
---   T4 利用者本人（MFA未設定＝aal1）は自分の案件・メッセージを読める。相談サマリ・緊急記録は読めない
+--   T4 利用者本人（MFA未設定＝aal1）は自分のメッセージ・アンケート回答と、ビュー my_cases（見せてよい列のみ）を読める。
+--      cases を直接読むこと（担当者の識別子・往復回数の取得）はできない。相談サマリ・緊急記録は読めない
 --   T5 別の利用者は他人の案件を1件も読めない
 --   T6 未ログイン（anon）は何も読めない（テーブル権限なし）
 --   T7 ログイン済みでも相談内容系テーブルへ直接 INSERT / UPDATE できない（書き込みはサーバールート経由のみ）
 --   T8 サーバーAPI用の service_role は全案件を読め、監査ログへ書き込める
 --
--- 最終実行：2026-09-30 dev（dial-dot-com-dev）で T1〜T8 すべて合格
+-- 最終実行：2026-09-30 dev（dial-dot-com-dev）で T1〜T8 すべて合格（user_case_visibility 適用後）
 --
 -- 実行方法：このファイル全体をそのまま実行する（Supabase の SQL Editor、または MCP の execute_sql）。
 -- 最後に必ず例外を投げてトランザクションごと取り消すため、テストデータは DB に残らない。
@@ -53,9 +54,12 @@ begin
     (e_1, u_user1, 'payment', 5, 24),
     (e_2, u_user1, 'payment', 5, 24);
 
-  insert into cases (case_id, entitlement_id, account_id, counselor_id, status) values
-    (c_a, e_1, u_user1, u_a, 'open'),
-    (c_b, e_2, u_user1, u_b, 'closed');
+  insert into cases (case_id, entitlement_id, account_id, counselor_id, status, opened_at) values
+    (c_a, e_1, u_user1, u_a, 'open',   now() - interval '1 hour'),
+    (c_b, e_2, u_user1, u_b, 'closed', now());
+
+  insert into case_survey_answers (case_id, survey_question_id, kind, question_text_snapshot, option_label_snapshot)
+  values (c_a, '5e000000-0000-4000-8000-0000000000b1', 'chief', '設問', '回答');
 
   insert into messages (case_id, sender, body) values
     (c_a, 'user', 'A担当案件のメッセージ'),
@@ -93,8 +97,12 @@ begin
   -- T4 利用者本人・aal1
   perform set_config('request.jwt.claims', json_build_object('sub', u_user1, 'role', 'authenticated', 'aal', 'aal1')::text, true);
   set local role authenticated;
-  select count(*) into n from cases;                        if n <> 2 then failures := failures || format('T4 cases=%s(期待2); ', n); end if;
+  select count(*) into n from cases;                        if n <> 0 then failures := failures || format('T4 cases=%s(期待0：利用者は cases を直接読めない); ', n); end if;
+  select count(*) into n from my_cases;                     if n <> 2 then failures := failures || format('T4 my_cases=%s(期待2); ', n); end if;
+  select count(*) into n from my_cases where case_id = c_b and status = 'closed' and continuity = 'changed';
+                                                            if n <> 1 then failures := failures || 'T4 my_cases の継続性（担当交代）が期待と違う; '; end if;
   select count(*) into n from messages;                     if n <> 2 then failures := failures || format('T4 messages=%s(期待2); ', n); end if;
+  select count(*) into n from case_survey_answers;          if n <> 1 then failures := failures || format('T4 survey_answers=%s(期待1); ', n); end if;
   select count(*) into n from case_summaries;               if n <> 0 then failures := failures || format('T4 summaries=%s(期待0); ', n); end if;
   select count(*) into n from emergency_records;            if n <> 0 then failures := failures || format('T4 emergency=%s(期待0); ', n); end if;
   select count(*) into n from counselors;                   if n <> 0 then failures := failures || format('T4 counselors=%s(期待0); ', n); end if;
@@ -104,6 +112,8 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', u_user2, 'role', 'authenticated', 'aal', 'aal1')::text, true);
   set local role authenticated;
   select count(*) into n from cases;                        if n <> 0 then failures := failures || format('T5 cases=%s(期待0); ', n); end if;
+  select count(*) into n from my_cases;                     if n <> 0 then failures := failures || format('T5 my_cases=%s(期待0); ', n); end if;
+  select count(*) into n from case_survey_answers;          if n <> 0 then failures := failures || format('T5 survey_answers=%s(期待0); ', n); end if;
   select count(*) into n from messages;                     if n <> 0 then failures := failures || format('T5 messages=%s(期待0); ', n); end if;
   reset role;
 

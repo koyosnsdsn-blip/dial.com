@@ -1,14 +1,13 @@
 // 相談履歴（要件 3.4.1）。開始日・状態・終了日と理由・主訴を返す。
-// - 本人の権限（RLS）で読み、さらに account_id を明示して絞る
+// - 本人の権限で、ビュー my_cases（本人の行・見せてよい列のみ）から読む
 // - 担当者に関する情報（氏名・識別子）と、案件の通番・往復回数は返さない（要件 3.6.1・3.4.2・3.3.1）
 export default defineEventHandler(async (event) => {
   const account = await requireAccount(event);
   const db = await userDb(event);
 
   const { data: rows, error } = await db
-    .from("cases")
+    .from("my_cases")
     .select("case_id, status, close_reason, opened_at, closed_at")
-    .eq("account_id", account.userId)
     .order("opened_at", { ascending: false });
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
 

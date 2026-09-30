@@ -62,9 +62,17 @@ useCaseRealtime(() => {
   if (timer) clearTimeout(timer);
   timer = setTimeout(() => load(), 300);
 });
-onMounted(() => load(true));
+// 画面に戻ってきたとき（タブの切り替え・スマホの復帰）に取り直す。相談員による対応完了などを反映するため
+function onVisible() {
+  if (document.visibilityState === "visible") load();
+}
+onMounted(() => {
+  load(true);
+  document.addEventListener("visibilitychange", onVisible);
+});
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer);
+  document.removeEventListener("visibilitychange", onVisible);
 });
 
 const timeline = computed<Item[]>(() => {
