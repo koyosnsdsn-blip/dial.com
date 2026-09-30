@@ -34,7 +34,7 @@ async function submit() {
   busy.value = true;
   try {
     await $fetch<unknown>("/api/signup", { method: "POST", body: { nickname: nickname.value, password: password.value } });
-    const { error } = await supabase.auth.signInWithPassword({ email: await nicknameToEmail(nickname.value), password: password.value });
+    const { error } = await supabase.auth.signInWithPassword({ email: await nicknameToEmail(nickname.value, useRuntimeConfig().public.nicknameDomain as string), password: password.value });
     if (error) {
       errorMessage.value = "登録は完了しました。ログイン画面から、ニックネームとパスワードでログインしてください。";
       return;

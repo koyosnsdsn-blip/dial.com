@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
   if (countError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
   if ((count ?? 0) >= MAX_SIGNUPS_PER_HOUR) throw createError({ statusCode: 429, statusMessage: "too_many_signups" });
 
-  const email = await nicknameToEmail(nickname);
+  const email = await nicknameToEmail(nickname, useRuntimeConfig(event).public.nicknameDomain as string);
   const { data, error } = await db.auth.admin.createUser({
     email,
     password,
@@ -52,6 +52,7 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 409, statusMessage: "nickname_taken" });
     }
     if (code === "weak_password") throw createError({ statusCode: 400, statusMessage: "weak_password" });
+    // email_address_invalid は、内部用の識別子のドメイン（NICKNAME_DOMAIN）を Supabase が受け付けなかった場合に出る
     console.error("[signup] createUser failed", code, error?.status);
     throw createError({ statusCode: 500, statusMessage: "signup_failed" });
   }

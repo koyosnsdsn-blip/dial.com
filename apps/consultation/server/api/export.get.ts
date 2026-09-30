@@ -61,7 +61,7 @@ export default defineEventHandler(async (event) => {
   setHeader(event, "Cache-Control", "no-store");
   return {
     出力日時: new Date().toISOString(),
-    登録情報: isNicknameEmail(own?.email ?? account.email)
+    登録情報: isNicknameEmail(own?.email ?? account.email, useRuntimeConfig(event).public.nicknameDomain as string)
       ? { ニックネーム: account.nickname, 登録日時: own?.created_at ?? null }
       : { メールアドレス: own?.email ?? account.email, 登録日時: own?.created_at ?? null },
     属性の回答: (attrRows ?? []).map((a: any) => ({

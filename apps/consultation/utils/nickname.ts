@@ -3,10 +3,15 @@
 // Supabase Auth はメールアドレス（または電話番号）を前提にしているため、ニックネームから
 // 「内部用の識別子（メールアドレスの形をした文字列）」を機械的に作り、それを Auth に登録する。
 //   - 利用者には見せない。メールの送信にも使わない
-//   - ドメインは .invalid（実在しないことが保証された予約済みドメイン）なので、誤って誰かに届くことはない
 //   - 同じニックネームからは必ず同じ識別子ができる（ログイン時に同じ計算をする）
 // ブラウザとサーバーの両方で使う（Web Crypto を使用）。
-export const NICKNAME_DOMAIN = "nick.dial-com.invalid";
+//
+// ドメインは設定値（runtimeConfig.public.nicknameDomain。環境変数 NICKNAME_DOMAIN）。
+//   - Supabase Auth は、.invalid / .test / example.com などの予約済みドメインや、DNSに存在しないドメインを
+//     「無効なメールアドレス」として拒否する。そのため、DNSに存在し、かつメールを受け取らないドメインを使う
+//   - dev の既定値は相談者側アプリ自身のホスト名（メールサーバーがないので、誤って誰かに届くことはない）
+//   - 一度決めたら変えないこと。変えると、それまでに登録した利用者がログインできなくなる
+//   - 管理側（apps/admin/server/utils/nickname.ts）と同じ値・同じ計算にすること
 export const NICKNAME_MIN = 2;
 export const NICKNAME_MAX = 20;
 
@@ -25,13 +30,13 @@ export function nicknameProblem(input: string): "length" | "chars" | null {
   return null;
 }
 
-export async function nicknameToEmail(input: string): Promise<string> {
+export async function nicknameToEmail(input: string, domain: string): Promise<string> {
   const bytes = new TextEncoder().encode(normalizeNickname(input));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `u-${hex.slice(0, 40)}@${NICKNAME_DOMAIN}`;
+  return `u-${hex.slice(0, 40)}@${domain}`;
 }
 
-export function isNicknameEmail(email: string | null | undefined): boolean {
-  return Boolean(email && email.toLowerCase().endsWith(`@${NICKNAME_DOMAIN}`));
+export function isNicknameEmail(email: string | null | undefined, domain: string): boolean {
+  return Boolean(email && email.toLowerCase().endsWith(`@${domain.toLowerCase()}`));
 }

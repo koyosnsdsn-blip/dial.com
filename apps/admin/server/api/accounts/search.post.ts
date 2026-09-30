@@ -10,7 +10,8 @@ export default defineEventHandler(async (event) => {
   if (input.length === 0 || input.length > 254) throw createError({ statusCode: 400, statusMessage: "invalid_email" });
   // 「@」を含まない入力はニックネームとして扱い、登録時と同じ計算で内部用の識別子に直して照合する
   const byNickname = !input.includes("@");
-  const email = byNickname ? nicknameToEmail(input) : input.toLowerCase();
+  const domain = useRuntimeConfig(event).public.nicknameDomain as string;
+  const email = byNickname ? nicknameToEmail(input, domain) : input.toLowerCase();
   if (!byNickname && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw createError({ statusCode: 400, statusMessage: "invalid_email" });
   }
@@ -43,8 +44,8 @@ export default defineEventHandler(async (event) => {
     account: {
       accountId: a.account_id as string,
       // ニックネームで登録した利用者は、内部用の識別子ではなく、照会に使ったニックネームを表示する
-      email: isNicknameEmail(a.email) ? null : (a.email as string | null),
-      nickname: isNicknameEmail(a.email) ? (byNickname ? input.normalize("NFKC").trim().toLowerCase() : "（ニックネームで登録）") : null,
+      email: isNicknameEmail(a.email, domain) ? null : (a.email as string | null),
+      nickname: isNicknameEmail(a.email, domain) ? (byNickname ? input.normalize("NFKC").trim().toLowerCase() : "（ニックネームで登録）") : null,
       tier: a.tier as "free" | "paid" | "member",
       clientName: a.client_id ? names.get(a.client_id) ?? null : null,
       postingSuspended: a.posting_suspended as boolean,

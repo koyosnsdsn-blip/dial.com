@@ -12,7 +12,7 @@ async function submit() {
   busy.value = true;
   errorMessage.value = "";
   const id = nickname.value.trim();
-  const email = id.includes("@") ? id : await nicknameToEmail(id);
+  const email = id.includes("@") ? id : await nicknameToEmail(id, useRuntimeConfig().public.nicknameDomain as string);
   const { error } = await supabase.auth.signInWithPassword({ email, password: password.value });
   busy.value = false;
 

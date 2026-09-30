@@ -49,6 +49,9 @@ export default defineNuxtConfig({
       // クライアント側にも公開される値。anonキーはRLS前提のため公開可
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+      // ニックネーム登録で使う内部用の識別子のドメイン（apps/consultation/utils/nickname.ts を参照）。
+      // 相談者側と管理側で必ず同じ値にすること。一度決めたら変えないこと
+      nicknameDomain: process.env.NICKNAME_DOMAIN || "dialcom-op-dev.vercel.app",
     },
   },
 

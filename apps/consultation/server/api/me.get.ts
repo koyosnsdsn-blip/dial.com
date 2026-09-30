@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
 
   return {
     // ニックネームで登録した利用者には、内部用の識別子（メールアドレスの形）を見せない
-    email: isNicknameEmail(account.email) ? null : account.email,
+    email: isNicknameEmail(account.email, useRuntimeConfig(event).public.nicknameDomain as string) ? null : account.email,
     nickname: account.nickname,
     linked: Boolean(account.clientId),
     canConsult: m.canConsult,
