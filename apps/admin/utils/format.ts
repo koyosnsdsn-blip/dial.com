@@ -1,18 +1,26 @@
-// 表示用の日時整形（日本時間）
-const dateTime = new Intl.DateTimeFormat("ja-JP", {
-  timeZone: "Asia/Tokyo",
-  month: "numeric",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
+// 表示用の整形（日時はすべて日本時間）
+const TZ = "Asia/Tokyo";
+const dateTimeFmt = new Intl.DateTimeFormat("ja-JP", { timeZone: TZ, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+const timeFmt = new Intl.DateTimeFormat("ja-JP", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+const dateFmt = new Intl.DateTimeFormat("ja-JP", { timeZone: TZ, year: "numeric", month: "long", day: "numeric", weekday: "short" });
+const dayKeyFmt = new Intl.DateTimeFormat("sv-SE", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
 
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return dateTime.format(new Date(iso));
+  return dateTimeFmt.format(new Date(iso));
+}
+export function formatTime(iso: string): string {
+  return timeFmt.format(new Date(iso));
+}
+export function formatDate(iso: string): string {
+  return dateFmt.format(new Date(iso));
+}
+// 日付の区切りを入れるための「日本時間での日付」（YYYY-MM-DD）
+export function dayKey(iso: string): string {
+  return dayKeyFmt.format(new Date(iso));
 }
 
-// 経過時間（例：「3時間前」）。SLA表示の正式版ではない（SLAは起点時刻からクライアント側で計算：CLAUDE.md 制約#6）
+// 経過時間（例：「3時間前」）
 export function formatElapsed(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return "—";
   const minutes = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000));
@@ -23,20 +31,62 @@ export function formatElapsed(iso: string | null | undefined, now = Date.now()):
   return `${Math.floor(hours / 24)}日前`;
 }
 
+// 返信待ちの経過時間（例：「5時間12分」）。SLAタイマーの表示用。
+// 起点時刻はサーバーから受け取り、表示の更新はブラウザ側で計算する（CLAUDE.md 制約#6）。
+// 期限（残り時間）は SLA の起算方式が未決のため表示しない（未決事項 No.47）。
+export function formatWaiting(iso: string | null | undefined, now = Date.now()): string {
+  if (!iso) return "—";
+  const minutes = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000));
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h}時間${m}分` : `${m}分`;
+}
+// 返信待ちが SLA 時間（暦時間換算）の何割に達したか。強調表示の目安にだけ使う
+export function waitingRatio(iso: string | null | undefined, slaHours: number, now = Date.now()): number {
+  if (!iso || !slaHours) return 0;
+  return (now - new Date(iso).getTime()) / (slaHours * 3600 * 1000);
+}
+
 export function shortId(id: string): string {
   return id.slice(0, 8);
+}
+
+const closeReasonLabel: Record<string, string> = {
+  rally: "往復回数の上限に到達",
+  expiry: "有効期間の満了",
+  idle: "無操作による自動終了",
+  manual: "相談員による対応完了",
+};
+export function formatCloseReason(reason: string | null | undefined): string {
+  return reason ? closeReasonLabel[reason] ?? reason : "—";
 }
 
 // APIエラーを画面向けの文言にする
 export function apiErrorMessage(e: any): string {
   const message = e?.statusMessage ?? e?.data?.statusMessage;
-  if (message === "service_key_not_configured") {
-    return "サーバーの設定（SUPABASE_SERVICE_ROLE_KEY）が完了していないため表示できません。";
-  }
-  if (message === "audit_log_failed") {
-    return "監査ログを記録できなかったため、表示を中止しました。時間をおいて再度お試しください。";
-  }
-  if (message === "not_found") return "案件が見つからないか、閲覧の権限がありません。";
-  if (message === "reason_required") return "理由を入力してください（500文字以内）。";
-  return "読み込みに失敗しました。時間をおいて再度お試しください。";
+  const map: Record<string, string> = {
+    service_key_not_configured: "サーバーの設定（SUPABASE_SERVICE_ROLE_KEY）が完了していないため表示できません。",
+    audit_log_failed: "監査ログを記録できなかったため、処理を中止しました。時間をおいて再度お試しください。",
+    not_found: "案件が見つからないか、閲覧の権限がありません。",
+    not_assignee: "この操作は担当相談員または運営管理者のみ行えます。",
+    admin_only: "この操作は運営管理者のみ行えます。",
+    reason_required: "理由を入力してください（500文字以内）。",
+    body_required: "本文を入力してください（5000文字以内）。",
+    detection_required: "検知した内容を入力してください。",
+    name_required: "氏名を入力してください。",
+    case_closed: "この案件はすでに終了しています。",
+    below_used: "使用済みの往復回数を下回る上限にはできません。",
+    invalid_counselor: "選択した相談員は現在有効ではありません。",
+    invalid_email: "メールアドレスの形式が正しくありません。",
+    already_exists: "このメールアドレスはすでに登録されています。",
+    email_failed: "招待メールを送信できませんでした。開発環境では、Supabase の組織メンバーのアドレスにしか送信できません。",
+    cannot_change_self: "自分自身の権限・状態は変更できません。",
+    last_admin: "有効な運営管理者が1人もいなくなるため、変更できません。",
+    handover_to_required: "担当中の案件があるため、引継ぎ先を選んでください。",
+    invalid_handover: "引継ぎ先に選んだ相談員は有効ではありません。",
+    invalid_date: "不在期間の日付が正しくありません（開始と終了の両方を入力してください）。",
+  };
+  if (message && map[message]) return map[message];
+  if (typeof message === "string" && message.startsWith("invalid_")) return "入力内容が正しくありません。";
+  return "処理に失敗しました。時間をおいて再度お試しください。";
 }

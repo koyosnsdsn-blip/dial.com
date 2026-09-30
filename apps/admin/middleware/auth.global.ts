@@ -5,11 +5,18 @@
 //   1. 未ログイン                     → /login
 //   2. ログイン済みだがMFA未通過（aal1） → /mfa（登録済みなら入力、未登録なら登録）
 //   3. MFA通過済みだが相談員として無効   → /forbidden
-//   4. すべて満たす                   → 目的の画面へ
+//   4. 運営管理者専用の画面に相談員が来た → /
+//   5. すべて満たす                   → 目的の画面へ
+//
+// /accept-invite（招待メールからのパスワード設定）はログイン前でも開ける。
 //
 // ここは画面遷移のためのガードであり、データを守る最終防衛線ではない。
 // サーバーAPIは server/utils/auth.ts の requireStaff() で、DBはRLSで、それぞれ独立に同じ条件を検査する。
+const ADMIN_ONLY = ["/staff", "/audit"];
+
 export default defineNuxtRouteMiddleware(async (to) => {
+  if (to.path === "/accept-invite") return;
+
   const supabase = useSupabaseClient();
   const { data } = await supabase.auth.getSession();
   const signedIn = Boolean(data.session);
@@ -44,6 +51,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   if (to.path === "/forbidden") {
+    return navigateTo("/");
+  }
+
+  if (ADMIN_ONLY.some((p) => to.path.startsWith(p)) && useStaff().value?.role !== "admin") {
     return navigateTo("/");
   }
 });

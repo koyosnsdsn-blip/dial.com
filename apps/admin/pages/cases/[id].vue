@@ -1,31 +1,42 @@
 <script setup lang="ts">
-// 案件詳細（要件 7.3）。現時点は、やり取りの閲覧と緊急フラグの設定・解除のみ。
-// 返信の送信・SLAタイマー・相談サマリ・緊急対応記録（emergency_records）は後日追加。
+// 案件詳細（要件 7.3）
+// 実装済み：やり取りの表示（送受信日時・日付の区切り 3.2.1）、返信、SLAタイマー（受信からの経過時間）、
+//           緊急フラグ、往復回数の調整、対応完了、緊急対応の記録（3.5）、担当変更（管理者）、案件の通番（3.4.2）
+// 未実装（未決事項による）：SLAの期限表示（No.47）、相談サマリ（No.15）、アンケート回答の表示（設問が未確定 No.38）、
+//           相談者へのメール通知（No.59）、テンプレート挿入（7.15 マスタ未整備）
 type Message = { messageId: string; sender: "user" | "counselor"; body: string; sentAt: string };
 type CaseDetail = {
   caseId: string;
+  seq: number;
   status: "open" | "closed";
   closeReason: string | null;
   urgent: boolean;
   openedAt: string;
   lastActivityAt: string;
   closedAt: string | null;
+  awaitingReplySince: string | null;
   rallyUsed: number;
+  rallyMax: number;
+  slaHours: number;
   kind: "corp" | "personal";
+  assigneeId: string | null;
   assigneeName: string | null;
   mine: boolean;
+  canOperate: boolean;
   messages: Message[];
+  rallyAdjustments: { delta: number; reason: string | null; adjustedAt: string; byName: string | null }[];
+  emergencyRecords: { recordId: string; detection: string | null; judgment: string | null; actionTaken: string | null; recordedAt: string; byName: string | null }[];
 };
+type StaffRow = { counselorId: string; name: string; role: string; status: string; absentNow: boolean; openCases: number };
 
 const route = useRoute();
+const staffMe = useStaff();
+const isAdmin = computed(() => staffMe.value?.role === "admin");
 const caseId = computed(() => String(route.params.id));
 const detail = ref<CaseDetail | null>(null);
 const loading = ref(true);
 const errorMessage = ref("");
-
-const reason = ref("");
-const saving = ref(false);
-const saveError = ref("");
+const now = ref(Date.now());
 
 async function load() {
   try {
@@ -38,21 +49,109 @@ async function load() {
   }
 }
 
-async function setUrgent(urgent: boolean) {
-  saving.value = true;
-  saveError.value = "";
+// やり取りに日付の区切りを挿入する（同一日は時刻のみ表示：要件 3.2.1）
+const timeline = computed(() => {
+  const out: ({ type: "date"; key: string; label: string } | { type: "msg"; key: string; m: Message })[] = [];
+  let last = "";
+  for (const m of detail.value?.messages ?? []) {
+    const k = dayKey(m.sentAt);
+    if (k !== last) {
+      out.push({ type: "date", key: `d-${k}`, label: formatDate(m.sentAt) });
+      last = k;
+    }
+    out.push({ type: "msg", key: m.messageId, m });
+  }
+  return out;
+});
+
+const remaining = computed(() => (detail.value ? Math.max(0, detail.value.rallyMax - detail.value.rallyUsed) : 0));
+const waitingLevel = computed(() => {
+  const d = detail.value;
+  if (!d?.awaitingReplySince) return "none";
+  const r = waitingRatio(d.awaitingReplySince, d.slaHours, now.value);
+  return r >= 0.75 ? "high" : r >= 0.5 ? "mid" : "low";
+});
+
+// ---- 操作共通 ----
+const busy = ref("");
+const actionError = ref("");
+async function run(name: string, fn: () => Promise<unknown>) {
+  busy.value = name;
+  actionError.value = "";
   try {
-    await $fetch(`/api/cases/${caseId.value}/urgent`, { method: "POST", body: { urgent, reason: reason.value } });
-    reason.value = "";
+    await fn();
     await load();
+    return true;
   } catch (e: any) {
-    saveError.value = apiErrorMessage(e);
+    actionError.value = apiErrorMessage(e);
+    return false;
   } finally {
-    saving.value = false;
+    busy.value = "";
   }
 }
 
-// 他の相談員による緊急フラグの変更・新着メッセージを即時反映する（この案件に関するものだけ）
+// 返信
+const reply = ref("");
+async function sendReply() {
+  const ok = await run("reply", () => $fetch(`/api/cases/${caseId.value}/messages`, { method: "POST", body: { body: reply.value } }));
+  if (ok) reply.value = "";
+}
+
+// 緊急フラグ
+const urgentReason = ref("");
+async function setUrgent(urgent: boolean) {
+  const ok = await run("urgent", () => $fetch(`/api/cases/${caseId.value}/urgent`, { method: "POST", body: { urgent, reason: urgentReason.value } }));
+  if (ok) urgentReason.value = "";
+}
+
+// 往復回数の調整
+const rallyReason = ref("");
+async function adjustRally(delta: 1 | -1) {
+  const ok = await run("rally", () => $fetch(`/api/cases/${caseId.value}/rally`, { method: "POST", body: { delta, reason: rallyReason.value } }));
+  if (ok) rallyReason.value = "";
+}
+
+// 対応完了（個人課金で往復回数が残っている場合は残回数を明示して確認する：要件 3.4.2）
+const closeReason = ref("");
+const confirmingClose = ref(false);
+async function closeCase() {
+  const ok = await run("close", () => $fetch(`/api/cases/${caseId.value}/close`, { method: "POST", body: { reason: closeReason.value } }));
+  if (ok) {
+    closeReason.value = "";
+    confirmingClose.value = false;
+  }
+}
+
+// 緊急対応の記録
+const emergency = reactive({ detection: "", judgment: "", actionTaken: "" });
+async function recordEmergency() {
+  const ok = await run("emergency", () => $fetch(`/api/cases/${caseId.value}/emergency`, { method: "POST", body: { ...emergency } }));
+  if (ok) Object.assign(emergency, { detection: "", judgment: "", actionTaken: "" });
+}
+
+// 担当変更（運営管理者のみ）
+const staffList = ref<StaffRow[]>([]);
+const assignTo = ref("");
+const assignReason = ref("");
+async function loadStaffList() {
+  if (!isAdmin.value) return;
+  try {
+    staffList.value = (await $fetch<StaffRow[]>("/api/staff")).filter((s) => s.status === "active");
+  } catch {
+    staffList.value = [];
+  }
+}
+async function assign() {
+  const ok = await run("assign", () =>
+    $fetch(`/api/cases/${caseId.value}/assign`, { method: "POST", body: { counselorId: assignTo.value, reason: assignReason.value } }),
+  );
+  if (ok) {
+    assignTo.value = "";
+    assignReason.value = "";
+  }
+}
+
+// 他の相談員による変更・新着メッセージを即時反映する（この案件に関するものだけ）
 let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 useCaseRealtime((_, changedCaseId) => {
   if (changedCaseId !== caseId.value) return;
@@ -60,7 +159,13 @@ useCaseRealtime((_, changedCaseId) => {
   reloadTimer = setTimeout(load, 300);
 });
 
-onMounted(load);
+let clock: ReturnType<typeof setInterval> | null = null;
+onMounted(() => {
+  load();
+  loadStaffList();
+  clock = setInterval(() => (now.value = Date.now()), 30000);
+});
+onBeforeUnmount(() => clock && clearInterval(clock));
 </script>
 
 <template>
@@ -73,70 +178,172 @@ onMounted(load);
       <p v-else-if="errorMessage" class="error">{{ errorMessage }}</p>
 
       <template v-else-if="detail">
-        <div v-if="detail.urgent && detail.status === 'open'" class="urgent-banner" role="alert">
-          この案件には緊急フラグが立っています
+        <div v-if="detail.urgent && detail.status === 'open'" class="urgent-banner" role="alert">この案件には緊急フラグが立っています</div>
+
+        <div class="head">
+          <h1>案件 {{ shortId(detail.caseId) }} <span class="seq">この相談者の {{ detail.seq }} 件目</span></h1>
+          <span v-if="detail.awaitingReplySince && detail.status === 'open'" class="sla" :class="waitingLevel">
+            返信待ち {{ formatWaiting(detail.awaitingReplySince, now) }}（SLA {{ detail.slaHours }}時間）
+          </span>
+          <span v-else-if="detail.status === 'open'" class="sla none">返信待ちなし</span>
         </div>
 
-        <h1>案件 {{ shortId(detail.caseId) }}</h1>
         <dl class="meta">
-          <dt>状態</dt><dd>{{ detail.status === "open" ? "対応中" : "終了" }}</dd>
+          <dt>状態</dt><dd>{{ detail.status === "open" ? "対応中" : `終了（${formatCloseReason(detail.closeReason)}）` }}</dd>
           <dt>種別</dt><dd>{{ detail.kind === "corp" ? "企業枠" : "個人" }}</dd>
-          <dt>担当</dt><dd>{{ detail.assigneeName ?? "未割当" }}<span v-if="detail.mine">（自分）</span></dd>
+          <dt>担当</dt><dd>{{ detail.assigneeName ?? (detail.assigneeId ? "（他の相談員）" : "未割当") }}<span v-if="detail.mine">（自分）</span></dd>
+          <dt>往復</dt><dd>{{ detail.rallyUsed }} / {{ detail.rallyMax }} 回（残り {{ remaining }} 回）</dd>
           <dt>開始</dt><dd>{{ formatDateTime(detail.openedAt) }}</dd>
-          <dt>最終更新</dt><dd>{{ formatDateTime(detail.lastActivityAt) }}</dd>
-          <dt>往復回数</dt><dd>{{ detail.rallyUsed }}</dd>
+          <dt v-if="detail.closedAt">終了</dt><dd v-if="detail.closedAt">{{ formatDateTime(detail.closedAt) }}</dd>
         </dl>
 
-        <section class="panel">
-          <h2>緊急フラグ</h2>
-          <p class="note">
-            設定・解除はほかの相談員・運営管理者の画面に即時に反映され、理由とともに監査ログに記録されます。
-          </p>
-          <label for="reason">理由（必須）</label>
-          <input id="reason" v-model="reason" maxlength="500" placeholder="例：希死念慮をうかがわせる記述があるため" />
-          <button
-            v-if="!detail.urgent"
-            class="danger"
-            type="button"
-            :disabled="saving || reason.trim() === ''"
-            @click="setUrgent(true)"
-          >
-            緊急フラグを立てる
-          </button>
-          <button v-else class="secondary" type="button" :disabled="saving || reason.trim() === ''" @click="setUrgent(false)">
-            緊急フラグを解除する
-          </button>
-          <p v-if="saveError" class="error" role="alert">{{ saveError }}</p>
-        </section>
+        <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
 
-        <section class="panel">
-          <h2>やり取り</h2>
-          <p v-if="detail.messages.length === 0" class="note">メッセージはまだありません。</p>
-          <ol class="messages">
-            <li v-for="m in detail.messages" :key="m.messageId" :class="m.sender">
-              <div class="who">{{ m.sender === "user" ? "相談者" : "相談員" }}・{{ formatDateTime(m.sentAt) }}</div>
-              <div class="body">{{ m.body }}</div>
-            </li>
-          </ol>
-        </section>
+        <div class="layout">
+          <section class="panel conversation">
+            <h2>やり取り</h2>
+            <p v-if="detail.messages.length === 0" class="note">メッセージはまだありません。</p>
+            <ol class="messages">
+              <template v-for="item in timeline" :key="item.key">
+                <li v-if="item.type === 'date'" class="date-sep"><span>{{ item.label }}</span></li>
+                <li v-else :class="item.m.sender">
+                  <div class="who">{{ item.m.sender === "user" ? "相談者" : "相談員" }}・{{ formatTime(item.m.sentAt) }}</div>
+                  <div class="body">{{ item.m.body }}</div>
+                </li>
+              </template>
+            </ol>
+
+            <form v-if="detail.canOperate" class="reply" @submit.prevent="sendReply">
+              <label for="reply">返信</label>
+              <textarea id="reply" v-model="reply" rows="5" maxlength="5000" placeholder="相談者への返信を入力（本文中で氏名を名乗らないでください）" />
+              <p class="note">
+                送信すると往復回数を1回使います（残り {{ remaining }} 回）。<span v-if="remaining === 1"><b>この返信で上限に達し、案件は終了します。</b></span>
+              </p>
+              <button type="submit" :disabled="busy !== '' || reply.trim() === ''">{{ busy === "reply" ? "送信中…" : "返信を送信" }}</button>
+            </form>
+            <p v-else-if="detail.status === 'closed'" class="note">この案件は終了しているため返信できません。</p>
+            <p v-else class="note">担当相談員または運営管理者のみ返信できます。</p>
+          </section>
+
+          <aside class="side">
+            <section class="panel">
+              <h2>緊急フラグ</h2>
+              <label for="urgent-reason">理由（必須）</label>
+              <input id="urgent-reason" v-model="urgentReason" maxlength="500" placeholder="例：希死念慮をうかがわせる記述" />
+              <button v-if="!detail.urgent" class="danger" type="button" :disabled="busy !== '' || urgentReason.trim() === ''" @click="setUrgent(true)">緊急フラグを立てる</button>
+              <button v-else class="secondary" type="button" :disabled="busy !== '' || urgentReason.trim() === ''" @click="setUrgent(false)">緊急フラグを解除する</button>
+              <p class="note">変更はほかの相談員・運営管理者の画面に即時に反映されます。</p>
+            </section>
+
+            <section v-if="detail.canOperate" class="panel">
+              <h2>往復回数の調整</h2>
+              <label for="rally-reason">理由（必須）</label>
+              <input id="rally-reason" v-model="rallyReason" maxlength="500" placeholder="例：事案が複雑なため延長" />
+              <div class="row">
+                <button class="secondary" type="button" :disabled="busy !== '' || rallyReason.trim() === ''" @click="adjustRally(-1)">−1 回</button>
+                <button class="secondary" type="button" :disabled="busy !== '' || rallyReason.trim() === ''" @click="adjustRally(1)">＋1 回</button>
+              </div>
+              <ul v-if="detail.rallyAdjustments.length" class="history">
+                <li v-for="(a, i) in detail.rallyAdjustments" :key="i">
+                  {{ formatDateTime(a.adjustedAt) }}　{{ a.delta > 0 ? "＋1" : "−1" }}　{{ a.reason }}<span v-if="a.byName">（{{ a.byName }}）</span>
+                </li>
+              </ul>
+            </section>
+
+            <section v-if="detail.canOperate" class="panel">
+              <h2>対応完了</h2>
+              <label for="close-reason">完了の理由（必須）</label>
+              <input id="close-reason" v-model="closeReason" maxlength="500" placeholder="例：案内先の窓口につながったため" />
+              <template v-if="!confirmingClose">
+                <button class="secondary" type="button" :disabled="busy !== '' || closeReason.trim() === ''" @click="confirmingClose = true">対応を完了する</button>
+              </template>
+              <div v-else class="confirm">
+                <p v-if="detail.kind === 'personal' && remaining > 0">
+                  <b>往復回数が {{ remaining }} 回残っています。</b>個人課金のため、完了すると相談者は再開に再度の課金が必要になります。本当に完了しますか？
+                </p>
+                <p v-else>この案件を完了します。よろしいですか？</p>
+                <div class="row">
+                  <button class="secondary" type="button" @click="confirmingClose = false">やめる</button>
+                  <button type="button" :disabled="busy !== ''" @click="closeCase">完了する</button>
+                </div>
+              </div>
+              <p class="note">相談者への「新しいご相談としてお受けします」の案内は、相談者側の画面が完成してから表示されます。</p>
+            </section>
+
+            <section v-if="isAdmin" class="panel">
+              <h2>担当の変更（管理者）</h2>
+              <label for="assign-to">新しい担当</label>
+              <select id="assign-to" v-model="assignTo">
+                <option value="">選択してください</option>
+                <option v-for="s in staffList" :key="s.counselorId" :value="s.counselorId" :disabled="s.counselorId === detail.assigneeId">
+                  {{ s.name }}（{{ s.role === "admin" ? "管理者" : "相談員" }}・対応中 {{ s.openCases }} 件{{ s.absentNow ? "・不在中" : "" }}）
+                </option>
+              </select>
+              <label for="assign-reason">理由（必須）</label>
+              <input id="assign-reason" v-model="assignReason" maxlength="500" placeholder="例：担当者の休暇のため" />
+              <button class="secondary" type="button" :disabled="busy !== '' || !assignTo || assignReason.trim() === ''" @click="assign">担当を変更する</button>
+              <p class="note">返信待ちの経過時間は引継ぎ時点で数え直しません（要件 3.6）。</p>
+            </section>
+
+            <section class="panel">
+              <h2>緊急対応の記録</h2>
+              <template v-if="detail.canOperate">
+                <label for="em-detection">検知した内容（必須）</label>
+                <textarea id="em-detection" v-model="emergency.detection" rows="2" maxlength="2000" />
+                <label for="em-judgment">判断</label>
+                <textarea id="em-judgment" v-model="emergency.judgment" rows="2" maxlength="2000" />
+                <label for="em-action">実施した対応</label>
+                <textarea id="em-action" v-model="emergency.actionTaken" rows="2" maxlength="2000" />
+                <button class="secondary" type="button" :disabled="busy !== '' || emergency.detection.trim() === ''" @click="recordEmergency">記録する</button>
+              </template>
+              <ul v-if="detail.emergencyRecords.length" class="history">
+                <li v-for="r in detail.emergencyRecords" :key="r.recordId">
+                  <div class="meta-line">{{ formatDateTime(r.recordedAt) }}<span v-if="r.byName">（{{ r.byName }}）</span></div>
+                  <div><b>検知：</b>{{ r.detection }}</div>
+                  <div v-if="r.judgment"><b>判断：</b>{{ r.judgment }}</div>
+                  <div v-if="r.actionTaken"><b>対応：</b>{{ r.actionTaken }}</div>
+                </li>
+              </ul>
+              <p v-else class="note">記録はまだありません。</p>
+            </section>
+          </aside>
+        </div>
       </template>
     </main>
   </div>
 </template>
 
 <style scoped>
-.page { max-width: 760px; margin: 24px auto; padding: 0 24px; }
+.page { max-width: 1120px; margin: 24px auto; padding: 0 24px; }
 .urgent-banner { margin-bottom: 16px; padding: 12px 16px; color: #fff; background: var(--danger); border-radius: 6px; font-weight: 700; }
-.meta { display: grid; grid-template-columns: 7em 1fr; gap: 6px 12px; font-size: 14px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.seq { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+.sla { font-size: 14px; padding: 4px 10px; border-radius: 12px; background: #ddf4ff; color: #0969da; }
+.sla.mid { background: #fff8c5; color: #7d4e00; }
+.sla.high { background: #fdecea; color: var(--danger); font-weight: 700; }
+.sla.none { background: #eaeef2; color: var(--muted); }
+.meta { display: grid; grid-template-columns: 5em 1fr; gap: 4px 12px; font-size: 14px; margin: 12px 0 16px; }
 .meta dt { color: var(--muted); }
 .meta dd { margin: 0; }
-.panel { margin-top: 24px; padding: 20px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
-.panel h2 { font-size: 16px; margin: 0 0 8px; }
-button { width: auto; padding: 8px 16px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+.panel { padding: 16px 18px; background: #fff; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 16px; }
+.panel h2 { font-size: 15px; margin: 0 0 8px; }
+.side .panel label { margin-top: 8px; }
+button { width: auto; padding: 8px 16px; margin-top: 10px; }
 button.danger { background: var(--danger); }
-.messages { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; gap: 8px; }
+select, textarea { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid var(--line); border-radius: 6px; font-family: inherit; }
+.messages { list-style: none; padding: 0; margin: 0 0 16px; display: flex; flex-direction: column; gap: 10px; }
 .messages li { max-width: 85%; padding: 10px 14px; border-radius: 8px; background: var(--bg); }
 .messages li.counselor { align-self: flex-end; background: #ddf4ff; }
+.messages li.date-sep { align-self: stretch; max-width: none; background: none; padding: 0; text-align: center; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); line-height: 0; margin: 10px 0; }
+.messages li.date-sep span { background: #fff; padding: 0 10px; }
 .messages .who { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .messages .body { white-space: pre-wrap; line-height: 1.7; }
+.reply { border-top: 1px solid var(--line); padding-top: 12px; }
+.confirm { margin-top: 10px; padding: 10px 12px; background: #fff8c5; border-radius: 6px; font-size: 14px; }
+.history { list-style: none; padding: 0; margin: 12px 0 0; font-size: 13px; display: flex; flex-direction: column; gap: 8px; }
+.history li { padding-top: 8px; border-top: 1px dashed var(--line); }
+.meta-line { color: var(--muted); font-size: 12px; }
 </style>
