@@ -28,6 +28,7 @@ comment on column clients.contract_type is '登録後に変更できない（要
 create or replace function forbid_contract_type_update()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   if new.contract_type is distinct from old.contract_type then
@@ -46,6 +47,7 @@ create trigger trg_forbid_contract_type_update
 create or replace function forbid_all_features_disabled()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   if new.feature_qa = false and new.feature_consult = false and new.feature_video = false then
@@ -87,24 +89,32 @@ create table client_admins (
 create or replace function check_client_admin_min_active()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 declare
-  target_client_id uuid;
   active_count int;
 begin
-  target_client_id := coalesce(old.client_id, new.client_id);
-  select count(*) into active_count
-  from client_admins
-  where client_id = target_client_id
-    and status = 'active'
-    and admin_id is distinct from (case when tg_op = 'DELETE' then old.admin_id else null end);
+  -- 「元の client_id から active な管理者が1人減る」操作（削除／非activeへの変更／別client_idへの付け替え）のみ検査する
+  if old.status = 'active'
+     and (tg_op = 'DELETE'
+          or new.status <> 'active'
+          or new.client_id is distinct from old.client_id) then
+    -- 自分自身を除いた、同じ client_id の active 管理者数
+    select count(*) into active_count
+    from client_admins
+    where client_id = old.client_id
+      and status = 'active'
+      and admin_id <> old.admin_id;
 
-  if tg_op in ('UPDATE', 'DELETE') and old.status = 'active' then
-    if (tg_op = 'DELETE' or new.status <> 'active') and active_count = 0 then
-      raise exception 'client_id % must keep at least one active client_admin', target_client_id;
+    if active_count = 0 then
+      raise exception 'client_id % must keep at least one active client_admin', old.client_id;
     end if;
   end if;
-  return coalesce(new, old);
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
 end;
 $$;
 

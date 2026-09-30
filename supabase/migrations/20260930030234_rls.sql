@@ -44,6 +44,12 @@ as $$
   );
 $$;
 
+-- 未ログイン（anon）からRPCとして呼ばれないようにする。RLSポリシーは authenticated のみ対象なので実行権限はそれで足りる
+revoke execute on function is_active_counselor() from public, anon;
+revoke execute on function is_active_admin_counselor() from public, anon;
+grant execute on function is_active_counselor() to authenticated;
+grant execute on function is_active_admin_counselor() to authenticated;
+
 comment on function is_active_counselor() is 'RLSポリシーから使用。SECURITY DEFINERでcounselorsテーブル自体のRLSと循環しないようにする';
 comment on function is_active_admin_counselor() is '同上。role=adminは全案件を閲覧できる（運営管理者）';
 
@@ -177,13 +183,61 @@ create policy audit_logs_select_admin_only
   using (is_active_admin_counselor());
 
 -- ============================================================
--- TODO（次フェーズ）：以下は本マイグレーションでは未着手。
--- 実装が進み次第、個別にRLSを設計すること（現時点ではservice role経由の
--- サーバールートからのみアクセスする前提とし、anon/authenticatedへの
--- ポリシーは一切付与していない＝デフォルト拒否）。
---   - questions / answers（公開済みのみ匿名でも読めるようにする想定）
+-- 上記以外の全テーブル：RLSを有効化し、ポリシーは付与しない（＝anon/authenticatedからは全拒否）
+--
+-- 注意：Supabase では public スキーマのテーブルに anon/authenticated への権限が既定で付与される。
+-- RLSを有効化しないと publishable(anon) key だけで読み書きできてしまうため、
+-- 「ポリシー未設計のテーブルも必ず RLS 有効化だけはしておく」こと。
+-- service role（Nuxt の server/api/）は RLS を迂回するので、現時点の実装方針（サーバールート経由）には影響しない。
+--
+-- TODO（次フェーズ）：実装が進み次第、以下に個別の SELECT ポリシーを設計する。
+--   - questions / answers（公開済みのみ匿名でも読めるようにする想定。account_id は返さないビュー経由）
 --   - genres / videos / notices（公開情報。読み取り公開ポリシーを検討）
 --   - entitlements / payments / subscriptions（本人のみ参照）
 --   - survey_questions / survey_options / account_attributes
 --   - clients / landing_pages / client_counselors
 -- ============================================================
+
+-- 契約・アカウント
+alter table clients               enable row level security;
+alter table landing_pages         enable row level security;
+alter table client_counselors     enable row level security;
+alter table consents              enable row level security;
+alter table sessions              enable row level security;
+alter table notification_settings enable row level security;
+
+-- 機能1（Q&A）
+alter table genres                enable row level security;
+alter table questions             enable row level security;
+alter table answers               enable row level security;
+alter table question_actions      enable row level security;
+alter table anonymization_edits   enable row level security;
+alter table reports               enable row level security;
+alter table post_quotas           enable row level security;
+
+-- 機能2（相談）のうち上で扱っていないもの
+alter table entitlements          enable row level security;
+alter table attachments           enable row level security;
+alter table rally_adjustments     enable row level security;
+
+-- アンケート
+alter table survey_questions      enable row level security;
+alter table survey_options        enable row level security;
+alter table account_attributes    enable row level security;
+
+-- 機能3（動画）
+alter table videos                enable row level security;
+alter table video_client_scopes   enable row level security;
+alter table video_views           enable row level security;
+
+-- 決済
+alter table payments              enable row level security;
+alter table subscriptions         enable row level security;
+
+-- 運営・権利行使
+alter table deletion_requests     enable row level security;
+alter table disclosure_requests   enable row level security;
+alter table reuse_consents        enable row level security;
+alter table mail_templates        enable row level security;
+alter table notices               enable row level security;
+alter table system_settings       enable row level security;

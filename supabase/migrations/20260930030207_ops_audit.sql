@@ -64,6 +64,7 @@ comment on table audit_logs is '追記専用。UPDATE/DELETEのポリシーを�
 create or replace function forbid_audit_logs_mutation()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   raise exception 'audit_logs is append-only: % is not allowed', tg_op;

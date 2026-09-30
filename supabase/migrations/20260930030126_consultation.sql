@@ -2,7 +2,7 @@
 --
 -- 重要：cases / messages / case_summaries / emergency_records / case_survey_answers は
 -- CLAUDE.md 制約#1・#2 の対象（サーバールート限定アクセス＋RLS必須＋audit_logs記録）。
--- RLSポリシーは 00000000000010_rls.sql にまとめて定義する。
+-- RLSポリシーは 20260930030234_rls.sql にまとめて定義する。
 
 create table entitlements (
   entitlement_id      uuid primary key default gen_random_uuid(),
@@ -85,6 +85,7 @@ comment on table case_summaries is '個人課金の案件のみ生成（3.9.2）
 create or replace function forbid_confirmed_summary_update()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   if old.status = 'confirmed' then

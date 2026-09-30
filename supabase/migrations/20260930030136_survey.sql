@@ -15,6 +15,7 @@ create table survey_questions (
 create or replace function check_survey_questions_active_max()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 declare
   active_count int;
