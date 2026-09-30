@@ -58,6 +58,7 @@ export function apiErrorMessage(e: any): string {
     not_found: "ご相談が見つかりませんでした。",
     empty_body: "メッセージを入力してください。",
     body_too_long: "メッセージは5000文字以内で入力してください。",
+    export_limit: "データの出力は、24時間に3回までです。時間をおいて、もう一度お試しください。",
     account_deleted: "このアカウントはご利用いただけません。",
   };
   if (message && map[message]) return map[message];

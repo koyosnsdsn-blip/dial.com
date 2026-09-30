@@ -2,7 +2,8 @@
 // マイページ：相談履歴（要件 3.4.1）、属性の確認・修正（3.11.9）、アカウント
 // - 履歴には、開始日・状態・終了日と理由・主訴を表示する。通番・往復回数・担当者は表示しない
 // - 企業会員向けの構成：決済・会員区分に関する表示は行わない（8.6.1.1）
-// 未実装：通知の受信設定（10.2）、メールアドレスの変更（10.3.2）、退会（10.3.3）、自身のデータの出力（10.3.4）、
+// メールアドレスの変更（10.3.2）は /mypage/email。自身のデータの出力（10.3.4）はこの画面の下部。
+// 未実装：通知の受信設定（10.2）、退会（10.3.3）、
 //         多要素認証の設定（10.3.5）、セッションの一覧（10.4）、相談内容の削除（9.3）
 type HistoryItem = {
   caseId: string;
@@ -63,6 +64,28 @@ async function changeAttr(item: AttrItem, event: Event) {
     savingId.value = "";
   }
 }
+// 自身のデータの出力（要件 10.3.4）
+const exporting = ref(false);
+const exportError = ref("");
+async function exportData() {
+  exporting.value = true;
+  exportError.value = "";
+  try {
+    const data = await $fetch<Record<string, unknown>>("/api/export");
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `my-data-${dayKey(new Date().toISOString())}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e: any) {
+    exportError.value = apiErrorMessage(e);
+  } finally {
+    exporting.value = false;
+  }
+}
+
 function currentOptionId(item: AttrItem): string {
   return item.options.find((o) => o.label === item.currentLabel)?.optionId ?? "";
 }
@@ -111,10 +134,20 @@ function currentOptionId(item: AttrItem): string {
           <h2>アカウント</h2>
           <p class="note">メールアドレス：{{ me?.email ?? "—" }}</p>
           <NuxtLink v-if="me && !me.linked" class="button secondary" to="/invite">招待コードを入力する</NuxtLink>
+          <NuxtLink class="button secondary" to="/mypage/email">メールアドレスを変更する</NuxtLink>
           <NuxtLink class="button secondary" to="/update-password">パスワードを変更する</NuxtLink>
           <button type="button" class="secondary" @click="signOut">ログアウト</button>
         </section>
       </template>
+      <section v-if="!loading && !errorMessage" class="card stack">
+        <h2>ご自身のデータの出力</h2>
+        <p class="note">
+          登録情報と、これまでのご相談（やり取りの全文・はじめにお答えいただいた内容）を、ファイルとして保存できます。<br />
+          <strong>ファイルにはご相談の内容が含まれます。</strong>ご家族や職場の方と共用の端末・保存先には置かないよう、ご注意ください。
+        </p>
+        <button type="button" class="secondary" :disabled="exporting" @click="exportData">{{ exporting ? "準備しています…" : "データをファイルに保存する" }}</button>
+        <p v-if="exportError" class="error" role="alert">{{ exportError }}</p>
+      </section>
       <EmergencyLink />
     </main>
   </div>

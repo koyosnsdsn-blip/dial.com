@@ -47,6 +47,14 @@ export async function requireAccount(event: H3Event): Promise<AccountContext> {
     if (error || !data) throw createError({ statusCode: 500, statusMessage: "query_failed" });
   }
 
+  // メールアドレスを変更した場合（要件 10.3.2）、確認が済むと Supabase Auth 側のアドレスが変わる。accounts にも反映する
+  const authEmail = typeof claims.email === "string" ? claims.email.toLowerCase() : null;
+  if (authEmail && !data.deleted_at && (data.email ?? "").toLowerCase() !== authEmail) {
+    const { error: syncError } = await serviceDb(event).from("accounts").update({ email: authEmail }).eq("account_id", userId);
+    if (syncError) console.error("[account] failed to sync email", syncError.code);
+    else data.email = authEmail;
+  }
+
   if (data.deleted_at) {
     throw createError({ statusCode: 403, statusMessage: "account_deleted" });
   }
