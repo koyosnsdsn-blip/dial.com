@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
 
   const { data: rows, error } = await db
     .from("my_cases")
-    .select("case_id, status, close_reason, opened_at, closed_at")
+    .select("case_id, status, close_reason, opened_at, closed_at, has_unread")
     .order("opened_at", { ascending: false });
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
 
@@ -38,6 +38,7 @@ export default defineEventHandler(async (event) => {
     closeReason: r.close_reason as string | null,
     openedAt: r.opened_at as string,
     closedAt: r.closed_at as string | null,
+    hasUnread: r.has_unread as boolean,
     chief: chiefByCase.get(r.case_id) ?? [],
   }));
   items.sort((a, b) => (a.status === b.status ? 0 : a.status === "open" ? -1 : 1));

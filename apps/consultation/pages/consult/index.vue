@@ -25,8 +25,13 @@ onMounted(async () => {
       <p v-if="loading" class="note">読み込んでいます…</p>
       <p v-else-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
       <template v-else-if="me">
-        <div v-if="me.openCaseId" class="card stack">
+        <div v-if="me.unreadCaseId" class="card stack unread">
+          <h2>相談員からお返事が届いています</h2>
+          <NuxtLink class="button" :to="`/consult/${me.unreadCaseId}`">お返事を読む</NuxtLink>
+        </div>
+        <div v-else-if="me.openCaseId" class="card stack">
           <h2>対応中のご相談があります</h2>
+          <p class="note">相談員からのお返事をお待ちください。お返事が届くと、この画面でお知らせします（メールなどでのお知らせはありません）。</p>
           <NuxtLink class="button" :to="`/consult/${me.openCaseId}`">メッセージを開く</NuxtLink>
         </div>
         <div v-else-if="me.canConsult" class="card stack">
@@ -48,3 +53,7 @@ onMounted(async () => {
     </main>
   </div>
 </template>
+
+<style scoped>
+.unread { border-color: var(--accent); border-width: 2px; background: var(--accent-soft); }
+</style>

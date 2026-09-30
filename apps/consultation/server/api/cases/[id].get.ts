@@ -27,6 +27,12 @@ export default defineEventHandler(async (event) => {
 
   await writeAudit(event, account, { action: "case.view", targetType: "cases", targetId: caseId });
 
+  // 既読の記録（未読の返信の表示を消す）。失敗しても表示は続ける
+  const { error: readError } = await sdb
+    .from("case_reads")
+    .upsert({ case_id: caseId, account_read_at: new Date().toISOString() }, { onConflict: "case_id" });
+  if (readError) console.error("[cases.view] failed to record read", readError.code);
+
   return {
     caseId: c.case_id,
     status: c.status,

@@ -7,6 +7,7 @@ export type Me = {
   canConsult: boolean;
   contractType: "corp" | "muni" | null;
   openCaseId: string | null;
+  unreadCaseId: string | null;
 };
 
 export const useMe = () => useState<Me | null>("me", () => null);

@@ -11,6 +11,7 @@ type HistoryItem = {
   closeReason: string | null;
   openedAt: string;
   closedAt: string | null;
+  hasUnread: boolean;
   chief: { question: string; answer: string }[];
 };
 type AttrItem = {
@@ -106,6 +107,7 @@ function currentOptionId(item: AttrItem): string {
             <li v-for="h in history" :key="h.caseId">
               <NuxtLink :to="`/consult/${h.caseId}`">
                 <span class="state" :class="h.status">{{ h.status === "open" ? "対応中" : "終了" }}</span>
+                <span v-if="h.hasUnread" class="state new">新しいお返事</span>
                 <span class="dates">
                   {{ formatShortDate(h.openedAt) }} 開始
                   <template v-if="h.status === 'closed'">／ {{ formatShortDate(h.closedAt) }} 終了（{{ formatCloseReason(h.closeReason) }}）</template>
@@ -160,6 +162,7 @@ function currentOptionId(item: AttrItem): string {
 .history a { display: block; padding: 12px 0; color: var(--fg); text-decoration: none; }
 .state { display: inline-block; padding: 1px 10px; margin-right: 8px; font-size: 0.8rem; border-radius: 999px; background: #e9ece9; }
 .state.open { background: var(--accent); color: #fff; }
+.state.new { background: #b42318; color: #fff; }
 .dates { font-size: 0.9rem; }
 .chief { display: block; margin-top: 4px; font-size: 0.85rem; color: var(--muted); }
 select { width: 100%; padding: 12px; font: inherit; border: 1px solid #aab3b1; border-radius: 8px; background: #fff; }
