@@ -33,6 +33,12 @@ begin
   values (corp_id, '【架空】サンプル株式会社', 'corp', 'active', true, true, true)
   on conflict (client_id) do nothing;
 
+  -- 招待コード（相談者側アプリの動作確認用）。未設定のときだけ、推測困難なランダム文字列を発行する。
+  -- 値はファイルに書かない。確認するときは：select invite_code from clients where client_id = 'dddddddd-0000-4000-8000-00000000c001';
+  update clients
+  set invite_code = translate(encode(gen_random_bytes(12), 'base64'), '+/=', 'xyz')
+  where client_id = corp_id and invite_code is null;
+
   insert into accounts (account_id, email, tier, client_id) values
     ('dddddddd-0000-4000-8000-000000000a01', 'sample-user1@example.invalid', 'paid', null),
     ('dddddddd-0000-4000-8000-000000000a02', 'sample-user2@example.invalid', 'free', null),

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 案件詳細（要件 7.3）
 // 実装済み：やり取りの表示（送受信日時・日付の区切り 3.2.1）、返信、SLAタイマー（受信からの経過時間）、
-//           緊急フラグ、往復回数の調整、対応完了、緊急対応の記録（3.5）、担当変更（管理者）、案件の通番（3.4.2）
-// 未実装（未決事項による）：SLAの期限表示（No.47）、相談サマリ（No.15）、アンケート回答の表示（設問が未確定 No.38）、
+//           緊急フラグ、往復回数の調整、対応完了、アンケート回答の表示（3.11。設問は仮：No.38）、緊急対応の記録（3.5）、担当変更（管理者）、案件の通番（3.4.2）
+// 未実装（未決事項による）：SLAの期限表示（No.47）、相談サマリ（No.15）、
 //           相談者へのメール通知（No.59）、テンプレート挿入（7.15 マスタ未整備）
 type Message = { messageId: string; sender: "user" | "counselor"; body: string; sentAt: string };
 type CaseDetail = {
@@ -23,6 +23,7 @@ type CaseDetail = {
   assigneeName: string | null;
   mine: boolean;
   canOperate: boolean;
+  survey: { kind: "attr" | "chief"; question: string; answer: string }[];
   messages: Message[];
   rallyAdjustments: { delta: number; reason: string | null; adjustedAt: string; byName: string | null }[];
   emergencyRecords: { recordId: string; detection: string | null; judgment: string | null; actionTaken: string | null; recordedAt: string; byName: string | null }[];
@@ -62,6 +63,17 @@ const timeline = computed(() => {
     out.push({ type: "msg", key: m.messageId, m });
   }
   return out;
+});
+
+// アンケートの回答：属性と主訴を区別して表示する。緊急度が「すぐに話したい」の場合は強調する（要件 7.3・3.11.5）
+// 【仮】強調の判定は選択肢のラベルで行う（設問・選択肢が未確定のため：未決事項 No.38）
+const URGENT_ANSWER = "すぐに話したい";
+const surveyGroups = computed(() => {
+  const items = detail.value?.survey ?? [];
+  return [
+    { label: "主訴（今回のご相談）", items: items.filter((a) => a.kind === "chief") },
+    { label: "属性", items: items.filter((a) => a.kind === "attr") },
+  ].filter((g) => g.items.length > 0);
 });
 
 const remaining = computed(() => (detail.value ? Math.max(0, detail.value.rallyMax - detail.value.rallyUsed) : 0));
@@ -197,6 +209,18 @@ onBeforeUnmount(() => clock && clearInterval(clock));
           <dt v-if="detail.closedAt">終了</dt><dd v-if="detail.closedAt">{{ formatDateTime(detail.closedAt) }}</dd>
         </dl>
 
+        <section v-if="detail.survey.length" class="survey" aria-label="アンケートの回答">
+          <div v-for="group in surveyGroups" :key="group.label" class="survey-group">
+            <h2>{{ group.label }}</h2>
+            <dl>
+              <template v-for="(a, i) in group.items" :key="i">
+                <dt>{{ a.question }}</dt>
+                <dd :class="{ hurry: a.answer === URGENT_ANSWER }">{{ a.answer }}</dd>
+              </template>
+            </dl>
+          </div>
+        </section>
+
         <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
 
         <div class="layout">
@@ -325,6 +349,13 @@ onBeforeUnmount(() => clock && clearInterval(clock));
 .meta { display: grid; grid-template-columns: 5em 1fr; gap: 4px 12px; font-size: 14px; margin: 12px 0 16px; }
 .meta dt { color: var(--muted); }
 .meta dd { margin: 0; }
+.survey { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.survey-group { padding: 12px 16px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.survey-group h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); }
+.survey-group dl { margin: 0; font-size: 14px; }
+.survey-group dt { color: var(--muted); font-size: 12px; }
+.survey-group dd { margin: 0 0 6px; }
+.survey-group dd.hurry { color: var(--danger); font-weight: 700; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
 @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
 .panel { padding: 16px 18px; background: #fff; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 16px; }

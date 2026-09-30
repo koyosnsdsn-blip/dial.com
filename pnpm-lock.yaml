@@ -41,6 +41,9 @@ importers:
       '@dial-com/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@nuxtjs/supabase':
+        specifier: ^2.0.10
+        version: 2.0.10
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.117.2

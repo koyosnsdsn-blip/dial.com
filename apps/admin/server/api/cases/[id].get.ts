@@ -1,4 +1,4 @@
-// 案件詳細（要件 7.3）。案件の情報、メッセージ（非表示化済みを除く）、往復回数の調整履歴、緊急対応の記録を返す。
+// 案件詳細（要件 7.3）。案件の情報、アンケートの回答、メッセージ（非表示化済みを除く）、往復回数の調整履歴、緊急対応の記録を返す。
 // - 本人の権限で読む（RLS）。担当外・存在しない案件はどちらも 404 とし、存在の有無を区別させない
 // - 相談内容の本文を含むため、返す前に必ず監査ログを記録する（要件 7.16）
 // - 案件の通番（同一相談者の何件目か）は相談員側にのみ返す（要件 3.4.2）
@@ -21,12 +21,14 @@ export default defineEventHandler(async (event) => {
   if (!row) throw createError({ statusCode: 404, statusMessage: "not_found" });
   const r: any = row;
 
-  const [{ data: messages, error: msgError }, { data: emergencies, error: emError }] = await Promise.all([
+  const [{ data: messages, error: msgError }, { data: emergencies, error: emError }, { data: survey, error: svError }] = await Promise.all([
     db.from("messages").select("message_id, sender, body, sent_at").eq("case_id", caseId).is("hidden_at", null).order("sent_at", { ascending: true }),
     db.from("emergency_records").select("record_id, detection, judgment, action_taken, recorded_at, counselor:counselors(name)").eq("case_id", caseId).order("recorded_at", { ascending: false }),
+    // アンケートの回答（回答時点の設問文・選択肢ラベルの複写。要件 3.11・7.3）
+    db.from("case_survey_answers").select("survey_question_id, kind, question_text_snapshot, option_label_snapshot").eq("case_id", caseId),
   ]);
-  if (msgError || emError) {
-    console.error("[cases.view] related query failed", msgError?.code ?? emError?.code);
+  if (msgError || emError || svError) {
+    console.error("[cases.view] related query failed", msgError?.code ?? emError?.code ?? svError?.code);
     throw createError({ statusCode: 500, statusMessage: "query_failed" });
   }
 
@@ -59,6 +61,15 @@ export default defineEventHandler(async (event) => {
     assigneeName: (r.counselor?.name as string | undefined) ?? null,
     mine,
     canOperate: r.status === "open" && (mine || staff.role === "admin"),
+    // 属性（attr）を先に、主訴（chief）を後に。同じ区分の中は設問IDの順（表示順を安定させるため）
+    survey: (survey ?? [])
+      .slice()
+      .sort((a: any, b: any) => (a.kind === b.kind ? String(a.survey_question_id).localeCompare(String(b.survey_question_id)) : a.kind === "attr" ? -1 : 1))
+      .map((a: any) => ({
+        kind: a.kind as "attr" | "chief",
+        question: a.question_text_snapshot as string,
+        answer: a.option_label_snapshot as string,
+      })),
     messages: (messages ?? []).map((m: any) => ({
       messageId: m.message_id as string,
       sender: m.sender as "user" | "counselor",
