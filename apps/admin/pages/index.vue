@@ -19,7 +19,11 @@ type CaseRow = {
   kind: "corp" | "personal";
   assigneeName: string | null;
   mine: boolean;
+  clientName: string | null;
+  hurry: boolean;
+  quickRestart: boolean;
 };
+type ClientOption = { clientId: string; name: string };
 
 const staff = useStaff();
 const cases = ref<CaseRow[]>([]);
@@ -27,7 +31,8 @@ const loading = ref(true);
 const errorMessage = ref("");
 const newlyUrgent = ref<Set<string>>(new Set());
 const now = ref(Date.now());
-const filters = reactive({ status: "open", assignee: "all", kind: "all", urgent: false });
+const filters = reactive({ status: "open", assignee: "all", kind: "all", urgent: false, client: "", from: "", to: "" });
+const clientOptions = ref<ClientOption[]>([]);
 
 const urgentCount = computed(() => cases.value.filter((c) => c.urgent && c.status === "open").length);
 const awaitingCount = computed(() => cases.value.filter((c) => c.status === "open" && c.awaitingReplySince).length);
@@ -37,6 +42,9 @@ async function load() {
   try {
     const query: Record<string, string> = { status: filters.status, assignee: filters.assignee, kind: filters.kind };
     if (filters.urgent) query.urgent = "1";
+    if (filters.client) query.client = filters.client;
+    if (filters.from) query.from = filters.from;
+    if (filters.to) query.to = filters.to;
     const next = await $fetch<CaseRow[]>("/api/cases", { query });
     // 前回の一覧では緊急でなかった案件が緊急になった場合、目立たせる
     const before = new Map(cases.value.map((c) => [c.caseId, c.urgent]));
@@ -84,8 +92,13 @@ function scheduleReload() {
 const { status: realtimeStatus } = useCaseRealtime(() => scheduleReload());
 
 let clock: ReturnType<typeof setInterval> | null = null;
-onMounted(() => {
+onMounted(async () => {
   load();
+  try {
+    clientOptions.value = await $fetch<ClientOption[]>("/api/client-options");
+  } catch {
+    clientOptions.value = [];
+  }
   clock = setInterval(() => (now.value = Date.now()), 30000);
 });
 onBeforeUnmount(() => {
@@ -138,6 +151,14 @@ watch(filters, load);
             <option value="corp">企業枠</option>
           </select>
         </label>
+        <label>契約クライアント
+          <select v-model="filters.client">
+            <option value="">すべて</option>
+            <option v-for="o in clientOptions" :key="o.clientId" :value="o.clientId">{{ o.name }}</option>
+          </select>
+        </label>
+        <label>開始日（から）<input v-model="filters.from" type="date" /></label>
+        <label>開始日（まで）<input v-model="filters.to" type="date" /></label>
         <label class="check"><input v-model="filters.urgent" type="checkbox" /> 緊急のみ</label>
       </div>
 
@@ -152,7 +173,7 @@ watch(filters, load);
               <th>状態</th>
               <th>案件</th>
               <th>返信待ち</th>
-              <th>種別</th>
+              <th>種別・クライアント</th>
               <th>担当</th>
               <th>往復（残り）</th>
               <th>最終更新</th>
@@ -169,10 +190,12 @@ watch(filters, load);
                 <span v-else-if="c.status === 'open' && c.awaitingReplySince" class="badge waiting">未返信</span>
                 <span v-else-if="c.status === 'open'" class="badge">対応中</span>
                 <span v-else class="badge muted" :title="formatCloseReason(c.closeReason)">終了</span>
+                <span v-if="c.hurry && c.status === 'open'" class="badge hurry" title="相談者がアンケートで「すぐに話したい」を選択">すぐに話したい</span>
+                <span v-if="c.quickRestart" class="badge restart" title="前回の終了から短期間で開始された相談">短期間での再開</span>
               </td>
               <td><NuxtLink :to="`/cases/${c.caseId}`">{{ shortId(c.caseId) }}</NuxtLink></td>
               <td :class="['wait', level(c)]">{{ c.status === "open" && c.awaitingReplySince ? formatWaiting(c.awaitingReplySince, now) : "—" }}</td>
-              <td>{{ c.kind === "corp" ? "企業枠" : "個人" }}<span class="sub">SLA {{ c.slaHours }}h</span></td>
+              <td>{{ c.kind === "corp" ? c.clientName ?? "企業枠" : "個人" }}<span class="sub">SLA {{ c.slaHours }}h</span></td>
               <td>{{ c.assigneeName ?? (c.mine ? "" : "未割当") }}<span v-if="c.mine" class="mine">{{ c.assigneeName ? "（自分）" : "自分" }}</span></td>
               <td>{{ c.rallyUsed }} / {{ c.rallyMax }}（{{ c.rallyRemaining }}）</td>
               <td>{{ formatElapsed(c.lastActivityAt, now) }}</td>
@@ -215,5 +238,8 @@ table.cases { width: 100%; border-collapse: collapse; background: #fff; border: 
 .badge.urgent { background: var(--danger); color: #fff; font-weight: 700; }
 .badge.waiting { background: #fff8c5; color: #7d4e00; }
 .badge.muted { background: #eaeef2; color: var(--muted); }
+.badge.hurry { margin-left: 4px; background: #fdecea; color: var(--danger); font-weight: 700; }
+.badge.restart { margin-left: 4px; background: #fff8c5; color: #7d4e00; }
+.filters input[type="date"] { width: auto; padding: 5px 8px; font-size: 14px; }
 .mine { color: var(--muted); font-size: 12px; }
 </style>

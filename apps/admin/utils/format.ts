@@ -92,6 +92,11 @@ export function apiErrorMessage(e: any): string {
     confirm_name_mismatch: "確認用に入力したクライアント名が一致しません。",
     invite_code_missing: "招待コードが発行されていません。先に招待コードを発行してください。",
     invalid_status: "この状態への変更はできません。",
+    question_text_required: "設問文を入力してください（200文字以内）。",
+    invalid_options: "選択肢は2〜10個、それぞれ50文字以内で、重複のないように入力してください。",
+    checklist_not_confirmed: "禁止事項に当たらないことを確認して、チェックを入れてください。",
+    survey_limit: "追加設問は2問までです。追加するには、既存の設問を取り下げてください。",
+    survey_retired: "この設問はすでに取り下げられています。",
   };
   if (message && map[message]) return map[message];
   if (typeof message === "string" && message.startsWith("invalid_")) return "入力内容が正しくありません。";

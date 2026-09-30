@@ -35,6 +35,10 @@ export default defineEventHandler(async (event) => {
   // 閲覧権限を確認できた案件についてのみ、service role で補足情報を読む
   const sdb = serviceDb(event);
   const limits = (await caseLimits(event, [caseId])).get(caseId);
+  const [restart, names] = await Promise.all([
+    quickRestartFlags(event, [{ case_id: caseId, account_id: r.account_id, opened_at: r.opened_at }]),
+    clientNames(event, [r.client_id]),
+  ]);
   const [{ data: adjustments }, { count: seq }] = await Promise.all([
     sdb.from("rally_adjustments").select("delta, reason, adjusted_at, counselor:counselors(name)").eq("case_id", caseId).order("adjusted_at", { ascending: false }),
     sdb.from("cases").select("case_id", { count: "exact", head: true }).eq("account_id", r.account_id).lte("opened_at", r.opened_at),
@@ -46,6 +50,10 @@ export default defineEventHandler(async (event) => {
   return {
     caseId: r.case_id as string,
     seq: seq ?? 1,
+    // 前回の終了から短期間での再開か（支援の要否を判断するための情報。要件 3.4.2）
+    quickRestart: restart.has(caseId),
+    quickRestartDays: QUICK_RESTART_DAYS,
+    clientName: r.client_id ? names.get(r.client_id) ?? null : null,
     status: r.status as "open" | "closed",
     closeReason: r.close_reason as string | null,
     urgent: r.urgent_flag as boolean,

@@ -2,7 +2,8 @@
 // 契約クライアントの設定（要件 7.10.2〜7.10.4・7.10.9）。運営管理者のみ。
 // 別のクライアントを誤って変更しないよう、編集中のクライアント名を常に表示する（7.10.1）。
 // 変更はすべて理由が必須で、変更前後とあわせて監査ログに記録される。
-// 未実装：初回アンケートの追加設問（7.10.5）、クライアント管理者アカウント（7.10.6）、ランディングページ（7.10.7）、
+// 初回アンケートの追加設問（7.10.5）は別画面（/clients/[id]/survey）。
+// 未実装：クライアント管理者アカウント（7.10.6）、ランディングページ（7.10.7）、
 //         実績利用率と案件数の推移（7.10.2）
 type Detail = {
   clientId: string;
@@ -153,7 +154,7 @@ const activateReason = ref("");
 const activateChecked = ref(false);
 function activate() {
   return run("activate", async () => {
-    await $fetch(`/api/clients/${clientId.value}`, { method: "PATCH", body: { status: "active", reason: activateReason.value } });
+    await $fetch<unknown>(`/api/clients/${clientId.value}`, { method: "PATCH", body: { status: "active", reason: activateReason.value } });
     activateReason.value = "";
     activateChecked.value = false;
     return "「有効」に切り替えました。招待コードが使えるようになりました。";
@@ -167,7 +168,7 @@ function inviteCode(action: "reissue" | "revoke") {
   const text = action === "reissue" ? "招待コードを再発行します。古いコードでは新しく登録できなくなります。よろしいですか？" : "招待コードを失効させます。再発行するまで、新しく登録できなくなります。よろしいですか？";
   if (!window.confirm(text)) return;
   return run("code", async () => {
-    await $fetch(`/api/clients/${clientId.value}/invite-code`, { method: "POST", body: { action, reason: codeReason.value } });
+    await $fetch<unknown>(`/api/clients/${clientId.value}/invite-code`, { method: "POST", body: { action, reason: codeReason.value } });
     codeReason.value = "";
     showCode.value = action === "reissue";
     return action === "reissue" ? "招待コードを再発行しました。" : "招待コードを失効させました。";
@@ -313,6 +314,12 @@ onMounted(load);
             </button>
           </fieldset>
           <p v-if="closed" class="note">契約が終了しているため、変更できません。</p>
+        </section>
+
+        <section class="panel">
+          <h2>初回アンケートの追加設問</h2>
+          <p class="note">このクライアントの所属者にだけ表示する設問（最大2問）を編集します。</p>
+          <NuxtLink :to="`/clients/${detail.clientId}/survey`">追加設問を編集する →</NuxtLink>
         </section>
 
         <section v-if="!closed" class="panel danger">

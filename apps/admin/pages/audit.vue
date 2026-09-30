@@ -28,6 +28,25 @@ const ACTIONS: Record<string, { label: string; important?: boolean }> = {
   "staff.invite": { label: "相談員の招待", important: true },
   "staff.update": { label: "相談員の権限・状態の変更", important: true },
   "audit.view": { label: "監査ログの閲覧" },
+  "client.list": { label: "契約クライアント一覧の閲覧" },
+  "client.view": { label: "契約クライアントの閲覧" },
+  "client.create": { label: "契約クライアントの登録", important: true },
+  "client.update": { label: "契約クライアントの設定変更", important: true },
+  "client.invite.reissue": { label: "招待コードの再発行", important: true },
+  "client.invite.revoke": { label: "招待コードの失効", important: true },
+  "client.close": { label: "契約の終了（所属の一括解除）", important: true },
+  "survey.view": { label: "追加設問の閲覧" },
+  "survey.create": { label: "追加設問の作成", important: true },
+  "survey.update": { label: "追加設問の変更", important: true },
+  "survey.retire": { label: "追加設問の取り下げ", important: true },
+  "account.lookup": { label: "利用者アカウントの照会", important: true },
+  "account.posting.suspend": { label: "投稿機能の停止", important: true },
+  "account.posting.resume": { label: "投稿機能の停止解除", important: true },
+  // 以下は利用者本人の操作（相談者側アプリ）
+  "case.start": { label: "相談の開始（利用者）" },
+  "client.link": { label: "招待コードによる所属の登録（利用者）" },
+  "client.link.failed": { label: "招待コードの入力失敗（利用者）" },
+  "attribute.update": { label: "属性の修正（利用者）" },
 };
 
 const route = useRoute();
@@ -48,7 +67,7 @@ async function load() {
   try {
     const query: Record<string, string | number> = { page: page.value };
     for (const [k, v] of Object.entries(filters)) if (v) query[k] = v;
-    data.value = await $fetch("/api/audit-logs", { query });
+    data.value = await $fetch<{ total: number; pageSize: number; items: Item[] }>("/api/audit-logs", { query });
     errorMessage.value = "";
   } catch (e: any) {
     errorMessage.value = apiErrorMessage(e);

@@ -66,6 +66,55 @@ export async function caseLimits(event: H3Event, caseIds: string[]): Promise<Map
   return result;
 }
 
+// 初回アンケートの緊急度で「すぐに話したい」が選ばれた案件は、一覧・詳細で強調する（要件 3.11.5）
+// 【仮】判定は選択肢のラベルで行う（設問・選択肢が未確定のため：未決事項 No.38）
+export const HURRY_ANSWER = "すぐに話したい";
+
+// 短期間の再開とみなす日数（要件 3.4.2）。【仮】期間は未決（未決事項 No.70）のため暫定で7日
+export const QUICK_RESTART_DAYS = 7;
+
+// 前回の終了から短期間で開始された案件か。支援の要否を判断するための情報であり、利用の抑止には使わない（3.4.2）。
+// 同じ相談者の他の案件（担当外を含む）の終了日時が必要なため service role で読む。返すのは真偽値だけ。
+// 呼ぶ前に、対象案件の閲覧権限を確認済みであること。
+export async function quickRestartFlags(
+  event: H3Event,
+  rows: { case_id: string; account_id: string; opened_at: string }[],
+): Promise<Set<string>> {
+  const flagged = new Set<string>();
+  const accountIds = [...new Set(rows.map((r) => r.account_id))];
+  if (accountIds.length === 0) return flagged;
+  const { data, error } = await serviceDb(event)
+    .from("cases")
+    .select("account_id, closed_at")
+    .in("account_id", accountIds)
+    .not("closed_at", "is", null);
+  if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+  const closedByAccount = new Map<string, number[]>();
+  for (const c of data ?? []) {
+    const list = closedByAccount.get(c.account_id) ?? [];
+    list.push(new Date(c.closed_at as string).getTime());
+    closedByAccount.set(c.account_id, list);
+  }
+  const windowMs = QUICK_RESTART_DAYS * 86400000;
+  for (const r of rows) {
+    const opened = new Date(r.opened_at).getTime();
+    const hit = (closedByAccount.get(r.account_id) ?? []).some((closed) => closed <= opened && opened - closed <= windowMs);
+    if (hit) flagged.add(r.case_id);
+  }
+  return flagged;
+}
+
+// 契約クライアントの名称（案件に複写されたクライアント。要件 7.2）
+export async function clientNames(event: H3Event, clientIds: (string | null)[]): Promise<Map<string, string>> {
+  const ids = [...new Set(clientIds.filter((x): x is string => Boolean(x)))];
+  const result = new Map<string, string>();
+  if (ids.length === 0) return result;
+  const { data, error } = await serviceDb(event).from("clients").select("client_id, name").in("client_id", ids);
+  if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+  for (const c of data ?? []) result.set(c.client_id, c.name);
+  return result;
+}
+
 // DB関数の例外（raise exception 'xxx'）を HTTP エラーに変換する
 export function rpcError(error: { message?: string; code?: string } | null): never {
   const msg = error?.message ?? "";

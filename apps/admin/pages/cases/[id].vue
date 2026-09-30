@@ -8,6 +8,9 @@ type Message = { messageId: string; sender: "user" | "counselor"; body: string; 
 type CaseDetail = {
   caseId: string;
   seq: number;
+  quickRestart: boolean;
+  quickRestartDays: number;
+  clientName: string | null;
   status: "open" | "closed";
   closeReason: string | null;
   urgent: boolean;
@@ -105,21 +108,21 @@ async function run(name: string, fn: () => Promise<unknown>) {
 // 返信
 const reply = ref("");
 async function sendReply() {
-  const ok = await run("reply", () => $fetch(`/api/cases/${caseId.value}/messages`, { method: "POST", body: { body: reply.value } }));
+  const ok = await run("reply", () => $fetch<unknown>(`/api/cases/${caseId.value}/messages`, { method: "POST", body: { body: reply.value } }));
   if (ok) reply.value = "";
 }
 
 // 緊急フラグ
 const urgentReason = ref("");
 async function setUrgent(urgent: boolean) {
-  const ok = await run("urgent", () => $fetch(`/api/cases/${caseId.value}/urgent`, { method: "POST", body: { urgent, reason: urgentReason.value } }));
+  const ok = await run("urgent", () => $fetch<unknown>(`/api/cases/${caseId.value}/urgent`, { method: "POST", body: { urgent, reason: urgentReason.value } }));
   if (ok) urgentReason.value = "";
 }
 
 // 往復回数の調整
 const rallyReason = ref("");
 async function adjustRally(delta: 1 | -1) {
-  const ok = await run("rally", () => $fetch(`/api/cases/${caseId.value}/rally`, { method: "POST", body: { delta, reason: rallyReason.value } }));
+  const ok = await run("rally", () => $fetch<unknown>(`/api/cases/${caseId.value}/rally`, { method: "POST", body: { delta, reason: rallyReason.value } }));
   if (ok) rallyReason.value = "";
 }
 
@@ -127,7 +130,7 @@ async function adjustRally(delta: 1 | -1) {
 const closeReason = ref("");
 const confirmingClose = ref(false);
 async function closeCase() {
-  const ok = await run("close", () => $fetch(`/api/cases/${caseId.value}/close`, { method: "POST", body: { reason: closeReason.value } }));
+  const ok = await run("close", () => $fetch<unknown>(`/api/cases/${caseId.value}/close`, { method: "POST", body: { reason: closeReason.value } }));
   if (ok) {
     closeReason.value = "";
     confirmingClose.value = false;
@@ -137,7 +140,7 @@ async function closeCase() {
 // 緊急対応の記録
 const emergency = reactive({ detection: "", judgment: "", actionTaken: "" });
 async function recordEmergency() {
-  const ok = await run("emergency", () => $fetch(`/api/cases/${caseId.value}/emergency`, { method: "POST", body: { ...emergency } }));
+  const ok = await run("emergency", () => $fetch<unknown>(`/api/cases/${caseId.value}/emergency`, { method: "POST", body: { ...emergency } }));
   if (ok) Object.assign(emergency, { detection: "", judgment: "", actionTaken: "" });
 }
 
@@ -155,7 +158,7 @@ async function loadStaffList() {
 }
 async function assign() {
   const ok = await run("assign", () =>
-    $fetch(`/api/cases/${caseId.value}/assign`, { method: "POST", body: { counselorId: assignTo.value, reason: assignReason.value } }),
+    $fetch<unknown>(`/api/cases/${caseId.value}/assign`, { method: "POST", body: { counselorId: assignTo.value, reason: assignReason.value } }),
   );
   if (ok) {
     assignTo.value = "";
@@ -193,7 +196,8 @@ onBeforeUnmount(() => clock && clearInterval(clock));
         <div v-if="detail.urgent && detail.status === 'open'" class="urgent-banner" role="alert">この案件には緊急フラグが立っています</div>
 
         <div class="head">
-          <h1>案件 {{ shortId(detail.caseId) }} <span class="seq">この相談者の {{ detail.seq }} 件目</span></h1>
+          <h1>案件 {{ shortId(detail.caseId) }} <span class="seq">この相談者の {{ detail.seq }} 件目</span>
+            <span v-if="detail.quickRestart" class="restart" :title="`前回の終了から${detail.quickRestartDays}日以内に開始された相談です。区切りが早すぎた、または課題が解決していない可能性があります`">短期間での再開</span></h1>
           <span v-if="detail.awaitingReplySince && detail.status === 'open'" class="sla" :class="waitingLevel">
             返信待ち {{ formatWaiting(detail.awaitingReplySince, now) }}（SLA {{ detail.slaHours }}時間）
           </span>
@@ -202,7 +206,7 @@ onBeforeUnmount(() => clock && clearInterval(clock));
 
         <dl class="meta">
           <dt>状態</dt><dd>{{ detail.status === "open" ? "対応中" : `終了（${formatCloseReason(detail.closeReason)}）` }}</dd>
-          <dt>種別</dt><dd>{{ detail.kind === "corp" ? "企業枠" : "個人" }}</dd>
+          <dt>種別</dt><dd>{{ detail.kind === "corp" ? "企業枠" : "個人" }}<template v-if="detail.clientName">（{{ detail.clientName }}）</template></dd>
           <dt>担当</dt><dd>{{ detail.assigneeName ?? (detail.assigneeId ? "（他の相談員）" : "未割当") }}<span v-if="detail.mine">（自分）</span></dd>
           <dt>往復</dt><dd>{{ detail.rallyUsed }} / {{ detail.rallyMax }} 回（残り {{ remaining }} 回）</dd>
           <dt>開始</dt><dd>{{ formatDateTime(detail.openedAt) }}</dd>
@@ -342,6 +346,7 @@ onBeforeUnmount(() => clock && clearInterval(clock));
 .urgent-banner { margin-bottom: 16px; padding: 12px 16px; color: #fff; background: var(--danger); border-radius: 6px; font-weight: 700; }
 .head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
 .seq { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+.restart { margin-left: 8px; padding: 2px 8px; font-size: 12px; font-weight: 600; border-radius: 10px; background: #fff8c5; color: #7d4e00; vertical-align: middle; }
 .sla { font-size: 14px; padding: 4px 10px; border-radius: 12px; background: #ddf4ff; color: #0969da; }
 .sla.mid { background: #fff8c5; color: #7d4e00; }
 .sla.high { background: #fdecea; color: var(--danger); font-weight: 700; }

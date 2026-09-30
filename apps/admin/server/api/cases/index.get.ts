@@ -10,6 +10,8 @@
 //   assignee = all（既定）| me | unassigned
 //   kind     = all（既定）| personal | corp
 //   urgent   = 1 で緊急のみ
+//   client   = 契約クライアントのID
+//   from, to = 利用権の付与日（＝案件の開始日。日本時間の日付 YYYY-MM-DD）の範囲
 export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event);
   const q = getQuery(event);
@@ -17,10 +19,14 @@ export default defineEventHandler(async (event) => {
   const assignee = q.assignee === "me" || q.assignee === "unassigned" ? q.assignee : "all";
   const kind = q.kind === "personal" || q.kind === "corp" ? q.kind : "all";
   const urgentOnly = q.urgent === "1";
+  const clientId = typeof q.client === "string" && q.client ? requireUuid(q.client, "client") : null;
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  const from = typeof q.from === "string" && day.test(q.from) ? q.from : null;
+  const to = typeof q.to === "string" && day.test(q.to) ? q.to : null;
 
   let request = (await userDb(event))
     .from("cases")
-    .select("case_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, counselor_id, counselor:counselors(name)")
+    .select("case_id, account_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, counselor_id, counselor:counselors(name)")
     .limit(300);
   if (status !== "all") request = request.eq("status", status);
   if (assignee === "me") request = request.eq("counselor_id", staff.userId);
@@ -28,6 +34,9 @@ export default defineEventHandler(async (event) => {
   if (kind === "personal") request = request.is("client_id", null);
   if (kind === "corp") request = request.not("client_id", "is", null);
   if (urgentOnly) request = request.eq("urgent_flag", true);
+  if (clientId) request = request.eq("client_id", clientId);
+  if (from) request = request.gte("opened_at", `${from}T00:00:00+09:00`);
+  if (to) request = request.lte("opened_at", `${to}T23:59:59.999+09:00`);
 
   const { data, error } = await request;
   if (error) {
@@ -35,7 +44,22 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: "query_failed" });
   }
   const rows = (data ?? []) as any[];
-  const limits = await caseLimits(event, rows.map((r) => r.case_id));
+  const ids = rows.map((r) => r.case_id as string);
+  const limits = await caseLimits(event, ids);
+
+  // 緊急度の自己申告（アンケートの主訴）。本人の権限（RLS）で読む
+  const hurry = new Set<string>();
+  if (ids.length > 0) {
+    const { data: answers, error: ansError } = await (await userDb(event))
+      .from("case_survey_answers")
+      .select("case_id")
+      .in("case_id", ids)
+      .eq("kind", "chief")
+      .eq("option_label_snapshot", HURRY_ANSWER);
+    if (ansError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+    for (const a of answers ?? []) hurry.add(a.case_id);
+  }
+  const [restart, names] = await Promise.all([quickRestartFlags(event, rows), clientNames(event, rows.map((r) => r.client_id))]);
 
   await writeAudit(event, staff, { action: "case.list", targetType: "cases" });
 
@@ -58,6 +82,9 @@ export default defineEventHandler(async (event) => {
       kind: l?.source === "client" ? "corp" : "personal",
       assigneeName: (r.counselor?.name as string | undefined) ?? null,
       mine: r.counselor_id === staff.userId,
+      clientName: r.client_id ? names.get(r.client_id) ?? null : null,
+      hurry: hurry.has(r.case_id),
+      quickRestart: restart.has(r.case_id),
     };
   });
 

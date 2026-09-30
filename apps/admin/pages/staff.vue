@@ -42,7 +42,7 @@ async function sendInvite() {
   inviteError.value = "";
   message.value = "";
   try {
-    await $fetch("/api/staff", { method: "POST", body: { ...invite } });
+    await $fetch<unknown>("/api/staff", { method: "POST", body: { ...invite } });
     message.value = `${invite.email} に招待メールを送りました。本人がパスワードと2段階認証を設定すると利用できます。`;
     Object.assign(invite, { email: "", name: "", role: "counselor" });
     await load();
@@ -81,7 +81,7 @@ async function save() {
     body.absentFrom = form.absentFrom || null;
     body.absentTo = form.absentTo || null;
     if (needsHandover.value) body.handoverTo = form.handoverTo;
-    await $fetch(`/api/staff/${current.value.counselorId}`, { method: "PATCH", body });
+    await $fetch<unknown>(`/api/staff/${current.value.counselorId}`, { method: "PATCH", body });
     message.value = `${current.value.name} さんの設定を変更しました。`;
     editing.value = null;
     await load();
@@ -151,7 +151,7 @@ onMounted(load);
           <label>不在の終了日<input v-model="form.absentTo" type="date" /></label>
         </div>
         <p v-if="current.isSelf" class="note">自分自身の権限・状態は変更できません（誰も管理できなくなることを防ぐため）。</p>
-        <p class="note">不在期間中は、今後作成する自動割当の対象から外れます（要件 7.12.1）。</p>
+        <p class="note">不在期間中は、新しい相談の自動割当の対象から外れます（要件 7.12.1）。自動割当の対象は権限が「相談員」の人です。</p>
 
         <label v-if="needsHandover">引継ぎ先（必須：対応中の案件が {{ current.openCases }} 件あります）
           <select v-model="form.handoverTo">
