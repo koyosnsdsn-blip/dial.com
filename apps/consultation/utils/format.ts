@@ -55,6 +55,7 @@ export function apiErrorMessage(e: any): string {
     survey_incomplete: "まだ選択されていない項目があります。",
     case_already_open: "すでに対応中のご相談があります。",
     case_closed: "このご相談はすでに終了しています。",
+    case_open: "対応中のご相談は削除できません。終了したあとに削除できます。",
     not_found: "ご相談が見つかりませんでした。",
     empty_body: "メッセージを入力してください。",
     body_too_long: "メッセージは5000文字以内で入力してください。",

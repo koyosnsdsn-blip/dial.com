@@ -42,7 +42,12 @@ const ACTIONS: Record<string, { label: string; important?: boolean }> = {
   "account.lookup": { label: "利用者アカウントの照会", important: true },
   "account.posting.suspend": { label: "投稿機能の停止", important: true },
   "account.posting.resume": { label: "投稿機能の停止解除", important: true },
+  "case.close.idle": { label: "無操作による自動終了（システム）" },
+  "account.signup": { label: "利用者の新規登録（システム）" },
+  "account.signup.code_failed": { label: "登録時の招待コード誤り（システム）" },
   // 以下は利用者本人の操作（相談者側アプリ）
+  "case.delete": { label: "相談内容の削除（利用者）", important: true },
+  "data.export": { label: "自身のデータの出力（利用者）", important: true },
   "case.start": { label: "相談の開始（利用者）" },
   "client.link": { label: "招待コードによる所属の登録（利用者）" },
   "client.link.failed": { label: "招待コードの入力失敗（利用者）" },

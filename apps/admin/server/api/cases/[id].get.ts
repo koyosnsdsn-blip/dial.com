@@ -35,9 +35,11 @@ export default defineEventHandler(async (event) => {
   // 閲覧権限を確認できた案件についてのみ、service role で補足情報を読む
   const sdb = serviceDb(event);
   const limits = (await caseLimits(event, [caseId])).get(caseId);
-  const [restart, names] = await Promise.all([
+  const [restart, names, frequent, deleted] = await Promise.all([
     quickRestartFlags(event, [{ case_id: caseId, account_id: r.account_id, opened_at: r.opened_at }]),
     clientNames(event, [r.client_id]),
+    frequentUseFlags(event, [{ case_id: caseId, account_id: r.account_id }]),
+    deletedCases(event, [caseId]),
   ]);
   const [{ data: adjustments }, { count: seq }] = await Promise.all([
     sdb.from("rally_adjustments").select("delta, reason, adjusted_at, counselor:counselors(name)").eq("case_id", caseId).order("adjusted_at", { ascending: false }),
@@ -54,6 +56,12 @@ export default defineEventHandler(async (event) => {
     quickRestart: restart.has(caseId),
     quickRestartDays: QUICK_RESTART_DAYS,
     clientName: r.client_id ? names.get(r.client_id) ?? null : null,
+    // 異常利用の検知（確認の契機。利用の抑止には使わない）
+    frequentUse: frequent.has(caseId),
+    frequentNote: `${FREQUENT_DAYS}日以内に${FREQUENT_CASES}件以上`,
+    repeatedAdjustments: (adjustments ?? []).length >= REPEATED_ADJUSTMENTS,
+    // 利用者が削除した案件（やり取りは非表示化済み。物理削除の予定日時まで保持）
+    deletedByUser: deleted.get(caseId) ?? null,
     status: r.status as "open" | "closed",
     closeReason: r.close_reason as string | null,
     urgent: r.urgent_flag as boolean,

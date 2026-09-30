@@ -15,6 +15,7 @@ type CaseView = {
   openedAt: string;
   closedAt: string | null;
   continuity: "same" | "changed" | null;
+  idleCloseAt: string | null;
   slaHours: number;
   contractType: "corp" | "muni" | null;
   canRestart: boolean;
@@ -105,6 +106,32 @@ const timeline = computed<Item[]>(() => {
   return out;
 });
 
+// 自動終了の予告（要件 3.2.6）。予定日の3日前から表示する。【仮】予告の時期は未決（未決事項 No.61）
+const IDLE_NOTICE_DAYS = 3;
+const idleNotice = computed(() => {
+  const at = detail.value?.idleCloseAt;
+  if (!at || detail.value?.status !== "open") return "";
+  const remaining = new Date(at).getTime() - Date.now();
+  if (remaining > IDLE_NOTICE_DAYS * 86400000) return "";
+  return `しばらくやり取りがないため、${formatDate(at)} ごろに、このご相談は自動的に終了します。続きがある場合は、メッセージをお送りください。終了したあとも、新しいご相談はいつでも始められます。`;
+});
+
+// 相談内容の削除（要件 9.3）。二段階で確認する
+const deleteStep = ref<"" | "confirm">("");
+const deleting = ref(false);
+const deleteError = ref("");
+async function deleteCase() {
+  deleting.value = true;
+  deleteError.value = "";
+  try {
+    await $fetch<unknown>(`/api/cases/${caseId.value}`, { method: "DELETE" });
+    await navigateTo("/mypage");
+  } catch (e: any) {
+    deleteError.value = apiErrorMessage(e);
+    deleting.value = false;
+  }
+}
+
 async function send() {
   const text = draft.value.trim();
   if (!text || sending.value) return;
@@ -163,6 +190,7 @@ async function send() {
             </template>
             <p v-else class="note">このやり取りは、引き続きご覧いただけます。</p>
           </div>
+          <p v-if="idleNotice" class="system">{{ idleNotice }}</p>
           <div ref="bottom"></div>
         </section>
 
@@ -172,6 +200,19 @@ async function send() {
           <p v-if="sendError" class="error" role="alert">{{ sendError }}</p>
           <button type="submit" :disabled="sending || draft.trim().length === 0">{{ sending ? "送信中…" : "送信する" }}</button>
         </form>
+        <section v-if="detail.status === 'closed'" class="delete">
+          <button v-if="deleteStep === ''" type="button" class="plain" @click="deleteStep = 'confirm'">このご相談を削除する</button>
+          <div v-else class="card stack">
+            <p><strong>このご相談のやり取りを削除します。削除すると、元に戻せません。</strong></p>
+            <p class="note">削除すると、すぐにご相談の履歴から見えなくなり、一定期間ののちに完全に消去されます。残しておきたい場合は、先にマイページの「データをファイルに保存する」をご利用ください。</p>
+            <p v-if="detail.contractType === 'muni'" class="notice warn">
+              すでに委託元へ報告された記録は、この操作では削除できません。委託元での削除をご希望の場合は、委託元へお申し出ください。
+            </p>
+            <p v-if="deleteError" class="error" role="alert">{{ deleteError }}</p>
+            <button type="button" class="danger" :disabled="deleting" @click="deleteCase">{{ deleting ? "削除しています…" : "削除する" }}</button>
+            <button type="button" class="secondary" :disabled="deleting" @click="deleteStep = ''">やめる</button>
+          </div>
+        </section>
       </template>
       <template v-else>
         <p class="error" role="alert">{{ errorMessage }}</p>
@@ -206,4 +247,7 @@ time { display: block; text-align: right; font-size: 0.75rem; color: var(--muted
 .system.closed p { margin-bottom: 10px; }
 .composer { padding-top: 8px; border-top: 1px solid var(--line); }
 .composer button { margin-top: 10px; }
+.delete { margin-top: 28px; text-align: center; }
+.delete .card { text-align: left; }
+button.danger { background: var(--danger); border-color: var(--danger); }
 </style>

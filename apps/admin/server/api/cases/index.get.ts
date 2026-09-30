@@ -59,7 +59,12 @@ export default defineEventHandler(async (event) => {
     if (ansError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
     for (const a of answers ?? []) hurry.add(a.case_id);
   }
-  const [restart, names] = await Promise.all([quickRestartFlags(event, rows), clientNames(event, rows.map((r) => r.client_id))]);
+  const [restart, names, frequent, deleted] = await Promise.all([
+    quickRestartFlags(event, rows),
+    clientNames(event, rows.map((r) => r.client_id)),
+    frequentUseFlags(event, rows),
+    deletedCases(event, ids),
+  ]);
 
   await writeAudit(event, staff, { action: "case.list", targetType: "cases" });
 
@@ -85,6 +90,8 @@ export default defineEventHandler(async (event) => {
       clientName: r.client_id ? names.get(r.client_id) ?? null : null,
       hurry: hurry.has(r.case_id),
       quickRestart: restart.has(r.case_id),
+      frequentUse: frequent.has(r.case_id),
+      deletedByUser: deleted.has(r.case_id),
     };
   });
 

@@ -22,6 +22,8 @@ type CaseRow = {
   clientName: string | null;
   hurry: boolean;
   quickRestart: boolean;
+  frequentUse: boolean;
+  deletedByUser: boolean;
 };
 type ClientOption = { clientId: string; name: string };
 
@@ -192,6 +194,8 @@ watch(filters, load);
                 <span v-else class="badge muted" :title="formatCloseReason(c.closeReason)">終了</span>
                 <span v-if="c.hurry && c.status === 'open'" class="badge hurry" title="相談者がアンケートで「すぐに話したい」を選択">すぐに話したい</span>
                 <span v-if="c.quickRestart" class="badge restart" title="前回の終了から短期間で開始された相談">短期間での再開</span>
+                <span v-if="c.frequentUse" class="badge restart" title="同じ相談者が短い期間に何度も相談を開始しています（確認の契機）">利用が頻繁</span>
+                <span v-if="c.deletedByUser" class="badge muted" title="利用者本人が削除した相談（やり取りは非表示）">本人が削除</span>
               </td>
               <td><NuxtLink :to="`/cases/${c.caseId}`">{{ shortId(c.caseId) }}</NuxtLink></td>
               <td :class="['wait', level(c)]">{{ c.status === "open" && c.awaitingReplySince ? formatWaiting(c.awaitingReplySince, now) : "—" }}</td>

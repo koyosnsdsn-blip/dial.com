@@ -41,6 +41,8 @@ export default defineEventHandler(async (event) => {
     closedAt: c.closed_at,
     // 前回の案件と担当が同じかどうか（DBのビューが状態だけを返す。担当者の識別子はこのAPIに届かない）
     continuity: c.continuity,
+    // このままやり取りがない場合に自動で終了する日時（企業枠のみ。返信待ちの間は null）。予告の表示に使う（要件 3.2.6）
+    idleCloseAt: c.idle_close_at,
     slaHours: ((ent as any)?.entitlement?.sla_hours as number | undefined) ?? 24,
     // 自治体委託型は、委託元へ報告される旨を画面に常時表示する（要件 3.12.4）
     contractType: ((client as any)?.contract_type as "corp" | "muni" | undefined) ?? null,

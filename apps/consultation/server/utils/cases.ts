@@ -10,6 +10,7 @@ export type OwnCase = {
   closed_at: string | null;
   client_id: string | null;
   continuity: "same" | "changed" | null;
+  idle_close_at: string | null;
 };
 
 // 本人の案件であることを確認する。本人の権限で、ビュー my_cases（本人の行・見せてよい列のみ）から読む。
@@ -18,7 +19,7 @@ export type OwnCase = {
 export async function requireOwnCase(event: H3Event, account: AccountContext, caseId: string): Promise<OwnCase> {
   const { data, error } = await (await userDb(event))
     .from("my_cases")
-    .select("case_id, status, close_reason, opened_at, closed_at, client_id, continuity")
+    .select("case_id, status, close_reason, opened_at, closed_at, client_id, continuity, idle_close_at")
     .eq("case_id", caseId)
     .maybeSingle();
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
@@ -38,6 +39,7 @@ export function rpcError(error: { message?: string; code?: string } | null): nev
     uq_cases_one_open_per_account: 409,
     not_found: 404,
     case_closed: 409,
+    case_open: 409,
     empty_body: 400,
     body_too_long: 400,
   };

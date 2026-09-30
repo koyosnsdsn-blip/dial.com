@@ -11,6 +11,10 @@ type CaseDetail = {
   quickRestart: boolean;
   quickRestartDays: number;
   clientName: string | null;
+  frequentUse: boolean;
+  frequentNote: string;
+  repeatedAdjustments: boolean;
+  deletedByUser: { requestedAt: string; purgeAfter: string | null } | null;
   status: "open" | "closed";
   closeReason: string | null;
   urgent: boolean;
@@ -195,6 +199,15 @@ onBeforeUnmount(() => clock && clearInterval(clock));
       <template v-else-if="detail">
         <div v-if="detail.urgent && detail.status === 'open'" class="urgent-banner" role="alert">この案件には緊急フラグが立っています</div>
 
+        <div v-if="detail.deletedByUser" class="deleted-banner" role="status">
+          この相談は、利用者本人が {{ formatDateTime(detail.deletedByUser.requestedAt) }} に削除しました。やり取りは非表示になっています<template v-if="detail.deletedByUser.purgeAfter">（{{ formatDateTime(detail.deletedByUser.purgeAfter) }} 以降に完全に消去する予定）</template>。
+        </div>
+        <p v-if="detail.frequentUse || detail.repeatedAdjustments" class="guard" role="status">
+          <template v-if="detail.frequentUse">この相談者は、{{ detail.frequentNote }}の相談を開始しています。</template>
+          <template v-if="detail.repeatedAdjustments">この案件では、往復回数の調整が繰り返されています。</template>
+          支援が必要な状態か、制度の目的に合った利用かを確認してください（利用を止めるための表示ではありません）。
+        </p>
+
         <div class="head">
           <h1>案件 {{ shortId(detail.caseId) }} <span class="seq">この相談者の {{ detail.seq }} 件目</span>
             <span v-if="detail.quickRestart" class="restart" :title="`前回の終了から${detail.quickRestartDays}日以内に開始された相談です。区切りが早すぎた、または課題が解決していない可能性があります`">短期間での再開</span></h1>
@@ -346,6 +359,8 @@ onBeforeUnmount(() => clock && clearInterval(clock));
 .urgent-banner { margin-bottom: 16px; padding: 12px 16px; color: #fff; background: var(--danger); border-radius: 6px; font-weight: 700; }
 .head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
 .seq { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+.deleted-banner { margin-bottom: 12px; padding: 10px 14px; background: #eaeef2; color: var(--fg); border-radius: 6px; font-size: 14px; }
+.guard { padding: 8px 12px; background: #fff8c5; color: #7d4e00; border-radius: 6px; font-size: 14px; }
 .restart { margin-left: 8px; padding: 2px 8px; font-size: 12px; font-weight: 600; border-radius: 10px; background: #fff8c5; color: #7d4e00; vertical-align: middle; }
 .sla { font-size: 14px; padding: 4px 10px; border-radius: 12px; background: #ddf4ff; color: #0969da; }
 .sla.mid { background: #fff8c5; color: #7d4e00; }
