@@ -9,8 +9,58 @@ useHead({
 </script>
 
 <template>
-  <div>
-    <h1>ダイヤル.com — 管理側アプリ</h1>
-    <p>準備中</p>
+  <div class="app">
+    <NuxtPage />
   </div>
 </template>
+
+<style>
+:root {
+  --fg: #1f2328;
+  --muted: #59636e;
+  --line: #d1d9e0;
+  --bg: #f6f8fa;
+  --accent: #0b5cad;
+  --danger: #b42318;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+.app { min-height: 100vh; }
+.card {
+  max-width: 420px;
+  margin: 64px auto;
+  padding: 32px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+h1 { font-size: 20px; margin: 0 0 20px; }
+label { display: block; font-size: 13px; margin: 14px 0 6px; color: var(--muted); }
+input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 15px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+button {
+  margin-top: 20px;
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 15px;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button.secondary { background: #fff; color: var(--fg); border: 1px solid var(--line); }
+button:disabled { opacity: 0.6; cursor: default; }
+.error { margin-top: 14px; color: var(--danger); font-size: 14px; }
+.note { font-size: 13px; color: var(--muted); line-height: 1.7; }
+</style>
