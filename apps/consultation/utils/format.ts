@@ -19,6 +19,23 @@ export function dayKey(iso: string): string {
   return dayKeyFmt.format(new Date(iso));
 }
 
+// 動画の長さ（例：1時間5分、12分）
+export function formatDuration(sec: number): string {
+  const m = Math.max(1, Math.round(sec / 60));
+  return m >= 60 ? `${Math.floor(m / 60)}時間${m % 60 ? `${m % 60}分` : ""}` : `${m}分`;
+}
+
+// ランディングページのアクセントカラー（要件 8.6.2）。事前に決めた候補から選ぶ。
+// 【仮】候補は暫定（未決事項 No.28）。いずれも白文字とのコントラスト比 4.5 以上。管理側にも同じ定義がある
+export const ACCENT_COLORS: Record<string, string> = {
+  teal: "#1d6b66",
+  blue: "#1f5fa8",
+  green: "#2f6b2f",
+  purple: "#6a3fa0",
+  brown: "#8a4b1f",
+  navy: "#2b3f6b",
+};
+
 // 終了の理由（利用者向け）。打ち切りとして伝えず、再開できることを必ず添える（要件 3.4.2）。
 // 回数そのものは表示しない（要件 3.3.1）。
 // 【仮】文面は暫定。自動文面として管理画面から編集できるようにするのは今後（要件 7.14.3、未決事項 No.74）
@@ -71,6 +88,21 @@ export function apiErrorMessage(e: any): string {
     inquiry_limit: "問い合わせは、24時間に5件までです。時間をおいて、もう一度お試しください。",
     confirm_mismatch: "確認の文言が一致しません。「退会する」と入力してください。",
     staff_account: "このメールアドレスは運営側（管理画面）のアカウントです。相談者側を使うときは、別のメールアドレスで登録してください。",
+    qa_not_found: "この記事は見つかりませんでした。公開が終了した可能性があります。",
+    qa_not_eligible: "質問の投稿は、月額会員の方がご利用いただけます。",
+    posting_suspended: "現在、質問の投稿をご利用いただけません。お心当たりのない場合は、運営への問い合わせからご連絡ください。",
+    quota_exceeded: "今月の投稿は上限（3問）に達しました。個別のご相談は「ご相談」からお受けしています。",
+    read_quota_exceeded: "今月、全文を読める本数（3本）を使い切りました。",
+    already_reported: "この記事は、すでに通報を受け付けています。",
+    report_limit: "通報の回数が上限に達しました。時間をおいて、もう一度お試しください。",
+    invalid_resubmit: "この投稿は書き直せません。",
+    resubmit_limit: "書き直しの回数が上限に達しました。",
+    invalid_genre: "ジャンルを選んでください。",
+    question_too_long: "質問は2000文字以内で入力してください。",
+    video_not_found: "この動画は見つかりませんでした。",
+    invalid_image: "画像は PNG または JPEG のみ送れます。",
+    too_many_images: "画像は1通につき3枚までです。",
+    image_too_large: "画像が大きすぎます。枚数を減らして、もう一度お試しください。",
     account_deleted: "このアカウントはご利用いただけません。",
   };
   if (message && map[message]) return map[message];

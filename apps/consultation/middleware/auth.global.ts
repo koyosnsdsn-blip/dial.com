@@ -20,5 +20,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return signedIn ? navigateTo("/consult") : undefined;
   }
   if (PUBLIC.includes(to.path)) return;
+  // Q&A の閲覧（投稿を除く）と、クライアント別の入口ページは、ログインしていなくても開ける
+  if ((to.path === "/qa" || to.path.startsWith("/qa/")) && to.path !== "/qa/post") return;
+  if (to.path.startsWith("/c/")) return;
   if (!signedIn) return navigateTo("/");
 });

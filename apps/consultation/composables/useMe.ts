@@ -5,6 +5,8 @@ export type Me = {
   nickname: string | null;
   linked: boolean;
   canConsult: boolean;
+  features: { qa: boolean; qaFull: boolean; qaPost: boolean; video: boolean };
+  personal: boolean;
   contractType: "corp" | "muni" | null;
   openCaseId: string | null;
   unreadCaseId: string | null;

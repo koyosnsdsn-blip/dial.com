@@ -6,8 +6,10 @@
 // - 緊急時の案内への導線を常設する（3.5）
 // - 終了後は送信欄を閉じ、理由と再開の案内を表示する。同じ画面から新しい相談を始められる（3.4.2）
 // - 相談員の返信は Realtime の合図を受けてサーバーAPIから取り直す（ポーリングしない）
-// 【仮】受付の自動応答・終了時の文面は暫定（未決事項 No.47・No.74）。添付ファイル（3.8）は未実装
-type Message = { messageId: string; sender: "user" | "counselor"; body: string; sentAt: string };
+// - 画像を添付できる（3.8）。送る前に端末の中で縮小し、撮影場所などの情報を取り除く
+// - 自動文面は、管理側で上書きできる（7.14.3）。上書きがなければ既定の文面（utils/autoTexts.ts）
+// 【仮】受付の自動応答・終了時の文面は暫定（未決事項 No.47・No.74）
+type Message = { messageId: string; sender: "user" | "counselor"; body: string; sentAt: string; attachments: string[] };
 type CaseView = {
   caseId: string;
   status: "open" | "closed";
@@ -20,6 +22,7 @@ type CaseView = {
   contractType: "corp" | "muni" | null;
   canRestart: boolean;
   messages: Message[];
+  reuseRequested: boolean;
 };
 type Item =
   | { type: "date"; key: string; label: string }
@@ -68,6 +71,7 @@ function onVisible() {
   if (document.visibilityState === "visible") load();
 }
 onMounted(() => {
+  loadAutoTexts();
   load(true);
   document.addEventListener("visibilitychange", onVisible);
 });
@@ -80,8 +84,8 @@ const timeline = computed<Item[]>(() => {
   const d = detail.value;
   if (!d) return [];
   const out: Item[] = [];
-  if (d.continuity === "same") out.push({ type: "system", key: "cont", text: "前回と同じ担当がお受けします。" });
-  if (d.continuity === "changed") out.push({ type: "system", key: "cont", text: "今回は、前回と別の担当がお受けします。" });
+  if (d.continuity === "same") out.push({ type: "system", key: "cont", text: autoText("continuity_same") });
+  if (d.continuity === "changed") out.push({ type: "system", key: "cont", text: autoText("continuity_changed") });
 
   let last = "";
   let accepted = false;
@@ -98,7 +102,7 @@ const timeline = computed<Item[]>(() => {
       out.push({
         type: "system",
         key: "accepted",
-        text: `メッセージを受け付けました。お返事までの目安は ${d.slaHours}時間 です。`,
+        text: autoText("accepted", { 返信までの時間: `${d.slaHours}時間` }),
         emergency: true,
       });
     }
@@ -113,7 +117,7 @@ const idleNotice = computed(() => {
   if (!at || detail.value?.status !== "open") return "";
   const remaining = new Date(at).getTime() - Date.now();
   if (remaining > IDLE_NOTICE_DAYS * 86400000) return "";
-  return `しばらくやり取りがないため、${formatDate(at)} ごろに、このご相談は自動的に終了します。続きがある場合は、メッセージをお送りください。終了したあとも、新しいご相談はいつでも始められます。`;
+  return autoText("idle_notice", { 終了予定日: formatDate(at) });
 });
 
 // 相談内容の削除（要件 9.3）。二段階で確認する
@@ -132,14 +136,71 @@ async function deleteCase() {
   }
 }
 
+// 添付する画像（1通につき3枚まで）
+const MAX_IMAGES = 3;
+const images = ref<{ blob: Blob; url: string }[]>([]);
+const imageError = ref("");
+async function pickImages(event: Event) {
+  const input = event.target as HTMLInputElement;
+  imageError.value = "";
+  for (const file of Array.from(input.files ?? [])) {
+    if (images.value.length >= MAX_IMAGES) {
+      imageError.value = `画像は1通につき${MAX_IMAGES}枚までです。`;
+      break;
+    }
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      imageError.value = "画像は PNG または JPEG のみ送れます。";
+      continue;
+    }
+    try {
+      const blob = await shrinkImage(file);
+      images.value.push({ blob, url: URL.createObjectURL(blob) });
+    } catch {
+      imageError.value = "画像を読み込めませんでした。別の画像でお試しください。";
+    }
+  }
+  input.value = "";
+}
+function removeImage(i: number) {
+  URL.revokeObjectURL(images.value[i].url);
+  images.value.splice(i, 1);
+}
+
+// 二次利用（Q&A としての公開）への同意（要件 9.4）
+const reuseBusy = ref(false);
+const reuseDone = ref("");
+async function answerReuse(agree: boolean) {
+  reuseBusy.value = true;
+  try {
+    await $fetch<unknown>(`/api/reuse/${caseId.value}`, { method: "POST", body: { agree } });
+    reuseDone.value = agree ? "ご協力ありがとうございます。お名前など、個人が分かる内容は取り除いたうえで掲載します。" : "承知しました。このご相談の内容は掲載しません。";
+    if (detail.value) detail.value.reuseRequested = false;
+  } catch (e: any) {
+    reuseDone.value = apiErrorMessage(e);
+  } finally {
+    reuseBusy.value = false;
+  }
+}
+
 async function send() {
   const text = draft.value.trim();
-  if (!text || sending.value) return;
+  if ((!text && images.value.length === 0) || sending.value) return;
   sending.value = true;
   sendError.value = "";
   try {
-    await $fetch(`/api/cases/${caseId.value}/messages`, { method: "POST", body: { body: text } });
+    let res: { failedImages?: number };
+    if (images.value.length) {
+      const form = new FormData();
+      form.append("body", text);
+      images.value.forEach((img, i) => form.append("images", img.blob, `image-${i + 1}.jpg`));
+      res = await $fetch<{ failedImages?: number }>(`/api/cases/${caseId.value}/messages`, { method: "POST", body: form });
+    } else {
+      res = await $fetch<{ failedImages?: number }>(`/api/cases/${caseId.value}/messages`, { method: "POST", body: { body: text } });
+    }
     draft.value = "";
+    images.value.forEach((img) => URL.revokeObjectURL(img.url));
+    images.value = [];
+    if (res.failedImages) sendError.value = `メッセージは送信しましたが、画像 ${res.failedImages} 枚を送れませんでした。もう一度お試しください。`;
     await load(true);
   } catch (e: any) {
     sendError.value = apiErrorMessage(e);
@@ -162,9 +223,7 @@ async function send() {
         <EmergencyLink />
 
         <section class="timeline" aria-label="やり取り">
-          <p v-if="detail.messages.length === 0 && detail.status === 'open'" class="system">
-            ご相談の準備ができました。下の欄から、お話しになりたいことをお送りください。うまくまとまっていなくても大丈夫です。
-          </p>
+          <p v-if="detail.messages.length === 0 && detail.status === 'open'" class="system">{{ autoText("start_empty") }}</p>
           <template v-for="item in timeline" :key="item.key">
             <p v-if="item.type === 'date'" class="date"><span>{{ item.label }}</span></p>
             <div v-else-if="item.type === 'system'" class="system">
@@ -177,15 +236,20 @@ async function send() {
               <div class="bubble">
                 <span class="who">{{ item.m.sender === "user" ? "あなた" : "相談員" }}</span>
                 <p class="body">{{ item.m.body }}</p>
+                <div v-if="item.m.attachments.length" class="images">
+                  <a v-for="a in item.m.attachments" :key="a" :href="`/api/cases/${detail.caseId}/attachments/${a}`" target="_blank" rel="noopener">
+                    <img :src="`/api/cases/${detail.caseId}/attachments/${a}`" alt="添付された画像" loading="lazy" />
+                  </a>
+                </div>
                 <time :datetime="item.m.sentAt">{{ formatTime(item.m.sentAt) }}</time>
               </div>
             </div>
           </template>
 
           <div v-if="detail.status === 'closed'" class="system closed">
-            <p>{{ closeReasonMessage(detail.closeReason) }}</p>
+            <p>{{ autoText(`closed_${detail.closeReason ?? "manual"}`) || closeReasonMessage(detail.closeReason) }}</p>
             <template v-if="detail.canRestart">
-              <p>お話ししたいことが残っている場合は、新しいご相談としてお受けします。費用のご負担はありません。</p>
+              <p>{{ autoText("restart_guide") }}</p>
               <NuxtLink class="button" to="/consult/start">新しい相談をはじめる</NuxtLink>
             </template>
             <p v-else class="note">このやり取りは、引き続きご覧いただけます。</p>
@@ -197,9 +261,33 @@ async function send() {
         <form v-if="detail.status === 'open'" class="composer" @submit.prevent="send">
           <label class="field" for="draft">メッセージ</label>
           <textarea id="draft" v-model="draft" rows="5" maxlength="5000" placeholder="ここに入力してください"></textarea>
+          <div v-if="images.length" class="picked">
+            <div v-for="(img, i) in images" :key="img.url" class="thumb">
+              <img :src="img.url" alt="送信する画像" />
+              <button type="button" class="plain" @click="removeImage(i)">外す</button>
+            </div>
+          </div>
+          <label class="attach">
+            <input type="file" accept="image/png,image/jpeg" multiple :disabled="sending || images.length >= MAX_IMAGES" @change="pickImages" />
+            <span>画像を添付する（{{ MAX_IMAGES }}枚まで）</span>
+          </label>
+          <p class="note">画像は縮小して送信します。撮影場所などの情報は取り除かれます。</p>
+          <p v-if="imageError" class="error" role="alert">{{ imageError }}</p>
           <p v-if="sendError" class="error" role="alert">{{ sendError }}</p>
-          <button type="submit" :disabled="sending || draft.trim().length === 0">{{ sending ? "送信中…" : "送信する" }}</button>
+          <button type="submit" :disabled="sending || (draft.trim().length === 0 && images.length === 0)">{{ sending ? "送信中…" : "送信する" }}</button>
         </form>
+        <section v-if="detail.reuseRequested || reuseDone" class="card stack reuse">
+          <template v-if="detail.reuseRequested">
+            <h2>運営からのお願い</h2>
+            <p>
+              このご相談の内容を、お名前など個人が分かる内容を取り除いたうえで、同じような悩みを持つ方の参考になる「Q&A」として掲載してもよいでしょうか。
+            </p>
+            <p class="note">お断りいただいても、ご相談への対応は一切変わりません。</p>
+            <button type="button" :disabled="reuseBusy" @click="answerReuse(true)">掲載してよい</button>
+            <button type="button" class="secondary" :disabled="reuseBusy" @click="answerReuse(false)">掲載しないでほしい</button>
+          </template>
+          <p v-else role="status">{{ reuseDone }}</p>
+        </section>
         <section v-if="detail.status === 'closed'" class="delete">
           <button v-if="deleteStep === ''" type="button" class="plain" @click="deleteStep = 'confirm'">このご相談を削除する</button>
           <div v-else class="card stack">
@@ -247,6 +335,16 @@ time { display: block; text-align: right; font-size: 0.75rem; color: var(--muted
 .system.closed p { margin-bottom: 10px; }
 .composer { padding-top: 8px; border-top: 1px solid var(--line); }
 .composer button { margin-top: 10px; }
+.images { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.images img { display: block; max-width: 160px; max-height: 160px; border-radius: 8px; border: 1px solid var(--line); }
+.picked { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.thumb { text-align: center; }
+.thumb img { display: block; width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.composer .thumb button { margin-top: 2px; }
+.attach { display: inline-block; margin-top: 10px; font-size: 0.9rem; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.attach input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.attach input:focus-visible + span { outline: 3px solid #7fb9b4; outline-offset: 2px; }
+.reuse { margin-top: 20px; }
 .delete { margin-top: 28px; text-align: center; }
 .delete .card { text-align: left; }
 button.danger { background: var(--danger); border-color: var(--danger); }

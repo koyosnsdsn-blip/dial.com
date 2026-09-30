@@ -4,8 +4,8 @@
 // - 企業会員向けの構成：決済・会員区分に関する表示は行わない（8.6.1.1）
 // メールアドレスの変更（10.3.2）は /mypage/email。自身のデータの出力（10.3.4）はこの画面の下部。
 // 運営への問い合わせ（10.5）は /contact、退会（10.3.3）は /mypage/withdraw。
-// 未実装：通知の受信設定（10.2）、
-//         多要素認証の設定（10.3.5）、セッションの一覧（10.4）、相談内容の削除（9.3）
+// 通知の受信設定（10.2）は /mypage/notifications、自分の投稿（機能1）は /mypage/questions。
+// 未実装：多要素認証の設定（10.3.5）、セッションの一覧（10.4）
 type HistoryItem = {
   caseId: string;
   status: "open" | "closed";
@@ -139,6 +139,8 @@ function currentOptionId(item: AttrItem): string {
           <p v-else class="note">メールアドレス：{{ me?.email ?? "—" }}</p>
           <NuxtLink v-if="me && !me.linked" class="button secondary" to="/invite">招待コードを入力する</NuxtLink>
           <NuxtLink v-if="me && !me.nickname" class="button secondary" to="/mypage/email">メールアドレスを変更する</NuxtLink>
+          <NuxtLink v-if="me?.features.qaPost" class="button secondary" to="/mypage/questions">自分の投稿（Q&amp;A）</NuxtLink>
+          <NuxtLink class="button secondary" to="/mypage/notifications">お知らせメールの設定</NuxtLink>
           <NuxtLink class="button secondary" to="/update-password">パスワードを変更する</NuxtLink>
           <button type="button" class="secondary" @click="signOut">ログアウト</button>
           <p class="note links"><NuxtLink to="/contact">運営への問い合わせ</NuxtLink>　／　<NuxtLink to="/mypage/withdraw">退会する</NuxtLink></p>

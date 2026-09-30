@@ -26,6 +26,11 @@ export default defineEventHandler(async (event) => {
   ]);
 
   await writeAudit(event, account, { action: "case.view", targetType: "cases", targetId: caseId });
+  const attached = await attachmentsOf(event, (messages ?? []).map((x: any) => x.message_id as string));
+
+  // 二次利用（Q&A としての公開）への同意の依頼が届いているか（要件 9.4）
+  const { data: reuse } = await sdb.from("reuse_consents").select("status, expires_at").eq("case_id", caseId).maybeSingle();
+  const reuseRequested = reuse?.status === "requested" && (!reuse.expires_at || new Date(reuse.expires_at).getTime() > Date.now());
 
   // 既読の記録（未読の返信の表示を消す）。失敗しても表示は続ける
   const { error: readError } = await sdb
@@ -53,6 +58,8 @@ export default defineEventHandler(async (event) => {
       sender: x.sender as "user" | "counselor",
       body: x.body as string,
       sentAt: x.sent_at as string,
+      attachments: attached.get(x.message_id) ?? [],
     })),
+    reuseRequested,
   };
 });

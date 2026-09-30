@@ -40,6 +40,12 @@ export default defineNuxtConfig({
     "/consult": { ssr: false },
     "/mypage/**": { ssr: false },
     "/mypage": { ssr: false },
+    // 【仮】Q&A は公開ページだが、いまはブラウザ側で表示している。検索エンジン向けにサーバー側で生成するかは、公開時に見直す
+    "/qa/**": { ssr: false },
+    "/qa": { ssr: false },
+    "/videos/**": { ssr: false },
+    "/videos": { ssr: false },
+    "/c/**": { ssr: false, headers: { "X-Robots-Tag": "noindex, nofollow" } },
   },
 
   runtimeConfig: {

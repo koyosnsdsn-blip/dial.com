@@ -3,7 +3,7 @@ import { isNicknameEmail } from "../../utils/nickname";
 // 所属クライアントの名称は返さない（ログイン後の画面にクライアントを表示しない：要件 8.6.2）
 export default defineEventHandler(async (event) => {
   const account = await requireAccount(event);
-  const m = await membership(event, account);
+  const [m, f] = await Promise.all([membership(event, account), featuresOf(event, account)]);
 
   // 対応中の案件の有無（案件IDのみ。内容は返さないため監査ログの対象外）
   // my_cases は本人の行だけを返すビュー（見せてよい列のみ）
@@ -21,6 +21,10 @@ export default defineEventHandler(async (event) => {
     nickname: account.nickname,
     linked: Boolean(account.clientId),
     canConsult: m.canConsult,
+    // 利用できる機能（無効な機能は、画面と導線を出さない：要件 3.10.7）
+    features: f,
+    // 企業会員向けの画面では、会員区分・決済に関する表示をしない（8.6.1.1）。個人利用者かどうかだけを返す
+    personal: account.tier !== "member",
     contractType: m.contractType,
     openCaseId: (open?.case_id as string | undefined) ?? null,
     // メールでの通知をしないため、ログイン後の画面で「お返事が届いています」と知らせる（未決事項一覧 2.12）
