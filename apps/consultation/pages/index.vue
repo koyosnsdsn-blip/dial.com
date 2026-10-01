@@ -15,7 +15,7 @@
       </NuxtLink>
       <NuxtLink class="entry" to="/start/nickname">
         <strong>ニックネームではじめる</strong>
-        <span>メールアドレス不要。ニックネームとパスワードだけ</span>
+        <span>メールアドレスも招待コードも不要。ニックネームとパスワードだけで相談できます</span>
       </NuxtLink>
       <NuxtLink class="entry" to="/start/email">
         <strong>メールアドレスではじめる</strong>

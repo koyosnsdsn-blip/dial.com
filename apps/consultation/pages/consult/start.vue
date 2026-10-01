@@ -6,7 +6,7 @@
 // - 勤務先に伝わる情報／伝わらない情報を明示する（3.10.3）。自治体委託型は報告への同意を取得する（3.12.4）
 // 【仮】説明の文面・返信の目安の表現は暫定（SLAの起算方式が未決：未決事項 No.47、文面は No.74）
 type Question = { questionId: string; kind: "attr" | "chief"; text: string; options: { optionId: string; label: string }[] };
-type Survey = { contractType: "corp" | "muni" | null; rallyMax: number; slaHours: number; questions: Question[] };
+type Survey = { contractType: "corp" | "muni" | null; personalFree: boolean; rallyMax: number; slaHours: number; questions: Question[] };
 
 const survey = ref<Survey | null>(null);
 const answers = reactive<Record<string, string>>({});
@@ -65,6 +65,10 @@ async function start() {
               <strong>このご相談の内容（やり取りの全文と、下の質問へのお答え）は、この事業の委託元へそのまま報告されます。</strong>
             </p>
           </template>
+          <ul v-else-if="survey.personalFree">
+            <li>お名前やメールアドレスをお聞きすることはありません。ニックネームのままご相談いただけます。</li>
+            <li>ご相談の内容は、相談員と運営の担当者だけが確認します。</li>
+          </ul>
           <ul v-else>
             <li>ご相談の内容が、勤務先に伝わることはありません。</li>
             <li>勤務先に、個人を特定できる形で共有される情報はありません。お名前・部署・社員番号は、このサービスではお預かりしていません。</li>

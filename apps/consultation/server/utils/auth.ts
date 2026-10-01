@@ -7,6 +7,7 @@
 // accounts の読み取りは本人の権限（RLS：本人の行のみ）で行い、行の作成だけ service role を使う。
 import type { H3Event } from "h3";
 import { serverSupabaseUser } from "#supabase/server";
+import { isNicknameEmail } from "../../utils/nickname";
 
 export type AccountContext = {
   userId: string;
@@ -82,6 +83,8 @@ export async function requireAccount(event: H3Event): Promise<AccountContext> {
 export type Membership = {
   // 相談を開始できる状態か（有効な契約クライアントに所属し、そのクライアントで相談機能が有効）
   canConsult: boolean;
+  // 招待コードなしで相談できる利用者か（ニックネームで登録した、所属のない利用者。費用はかからない）
+  personalFree: boolean;
   contractType: "corp" | "muni" | null;
   rallyMax: number;
   slaHours: number;
@@ -90,8 +93,18 @@ export type Membership = {
 // 所属クライアントの契約状態。clients はブラウザに権限を与えていないため service role で読む。
 // クライアントの名称・ロゴは返さない（ログイン後の画面には表示しない：要件 8.6.2）
 export async function membership(event: H3Event, account: AccountContext): Promise<Membership> {
-  const none: Membership = { canConsult: false, contractType: null, rallyMax: 0, slaHours: 0 };
-  if (!account.clientId || account.tier !== "member") return none;
+  const none: Membership = { canConsult: false, personalFree: false, contractType: null, rallyMax: 0, slaHours: 0 };
+  if (!account.clientId) {
+    // 【仮】ニックネームで登録した利用者は、招待コードなしで相談を始められる（2026-10-01 入江さんの指示）。
+    // 判定は、登録時にサーバーが作った内部用の識別子（メールアドレスの形）で行う。利用者が自分で書き換えられる
+    // ニックネームの表示名（user_metadata）では判定しない。
+    // メールアドレスで登録した利用者は、これまでどおり招待コード（または今後の決済）が必要
+    if (!isNicknameEmail(account.email, useRuntimeConfig(event).public.nicknameDomain as string)) return none;
+    const { data: s } = await serviceDb(event).from("system_settings").select("setting_value").eq("setting_key", "personal_rally_max").maybeSingle();
+    const n = s && /^\d{1,2}$/.test(s.setting_value ?? "") ? Number(s.setting_value) : 5;
+    return { canConsult: true, personalFree: true, contractType: null, rallyMax: Math.min(10, Math.max(1, n)), slaHours: 24 };
+  }
+  if (account.tier !== "member") return none;
   const { data, error } = await serviceDb(event)
     .from("clients")
     .select("status, contract_type, feature_consult, rally_max, sla_hours")
@@ -99,5 +112,5 @@ export async function membership(event: H3Event, account: AccountContext): Promi
     .maybeSingle();
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
   if (!data || data.status !== "active" || !data.feature_consult) return none;
-  return { canConsult: true, contractType: data.contract_type, rallyMax: data.rally_max, slaHours: data.sla_hours };
+  return { canConsult: true, personalFree: false, contractType: data.contract_type, rallyMax: data.rally_max, slaHours: data.sla_hours };
 }

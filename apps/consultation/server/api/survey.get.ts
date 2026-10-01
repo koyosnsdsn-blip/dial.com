@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
   const answered = new Set(attrs.map((a) => a.questionId));
   return {
     contractType: m.contractType,
+    personalFree: m.personalFree,
     rallyMax: m.rallyMax,
     slaHours: m.slaHours,
     questions: questions.filter((q) => q.kind === "chief" || !answered.has(q.questionId)),
