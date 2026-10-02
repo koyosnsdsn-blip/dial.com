@@ -1,9 +1,13 @@
-// 相談者側アプリの画面ガード。
+// 画面ガード。
+// 運営画面（/ops/…）とクライアント管理サイト（/client-admin/…）は、ops/guard.ts の判定に任せる。
+// それ以外（相談者側）は、以下のとおり。
 // 公開ページ（トップ・緊急時の案内・ログイン・新規登録など）以外は、ログインが必要。
 // 利用者の多要素認証は任意（要件 8.8.4）。設定画面は未実装のため、ここでは検査しない。
 //
 // ここは画面遷移のためのガードであり、データを守る最終防衛線ではない。
 // サーバーAPIは server/utils/auth.ts の requireAccount() で、DBはRLSで、それぞれ独立に検査する。
+import { opsGuard } from "../ops/guard";
+
 const PUBLIC = ["/", "/emergency", "/login", "/signup", "/confirm", "/forgot", "/start/invite", "/start/nickname", "/start/email"];
 // ログイン済みなら、入口ではなく相談の画面へ進める
 const GUEST_ONLY = ["/login", "/signup", "/start/invite", "/start/nickname", "/start/email"];
@@ -11,6 +15,8 @@ const GUEST_ONLY = ["/login", "/signup", "/start/invite", "/start/nickname", "/s
 export default defineNuxtRouteMiddleware(async (to) => {
   // 公開ページのうちサーバー側で生成するもの（トップ・緊急時の案内）は、判定せずに表示する
   if (import.meta.server) return;
+
+  if (isOpsPath(to.path)) return opsGuard(to);
 
   const supabase = useSupabaseClient();
   const { data } = await supabase.auth.getSession();
@@ -25,3 +31,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (to.path.startsWith("/c/")) return;
   if (!signedIn) return navigateTo("/");
 });
+
+function isOpsPath(path: string): boolean {
+  return path === "/ops" || path.startsWith("/ops/") || path === "/client-admin" || path.startsWith("/client-admin/");
+}

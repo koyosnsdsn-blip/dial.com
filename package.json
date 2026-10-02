@@ -8,9 +8,7 @@
   ],
   "scripts": {
     "dev:consultation": "pnpm --filter consultation dev",
-    "dev:admin": "pnpm --filter admin dev",
     "build:consultation": "pnpm --filter consultation build",
-    "build:admin": "pnpm --filter admin build",
     "typecheck": "pnpm -r typecheck",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",

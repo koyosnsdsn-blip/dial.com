@@ -20,23 +20,30 @@
 
 ## 2. リポジトリ構成
 
-2つのNuxtアプリ（別Vercelプロジェクト）＋共通パッケージのモノレポとする。
+1つのNuxtアプリ（1つのVercelプロジェクト・1つのFQDN）＋共通パッケージのモノレポとする。
+
+> 2026-10-02 変更：当初は相談者側と管理側を別アプリ（別Vercelプロジェクト）にしていたが、脆弱性診断の費用が対象のFQDNごとにかかるため、ホストを1つにまとめた（ダイヤルさんの判断）。運営画面はパスで分ける。`/apps/admin` はまとめる前の旧コードで、Vercel の dial.com-admin-dev を止めるまでの間だけ残している。**新しい変更は `/apps/consultation` にだけ入れること。**
 
 ```
 /apps
-  /consultation   ← 相談者側アプリ（一般向け・企業会員向け。8.6.1のドメイン出し分けはこの中で行う）
-  /admin          ← 管理側アプリ（相談員・運営管理者。クライアント管理サイトも暫定的にここに含める）
+  /consultation   ← アプリ本体（8.6.1のドメイン出し分けもこの中で行う）
+    /pages              … 相談者側（一般向け・企業会員向け）
+    /pages/ops          … 運営画面（相談員・運営管理者）。URLは /ops/…
+    /pages/client-admin … クライアント管理サイト。URLは /client-admin/…
+    /server/api         … 相談者側のサーバールート
+    /server/api/ops     … 運営画面のサーバールート（/api/ops/…）
+    /server/api/client-admin … クライアント管理サイトのサーバールート
+    /server/ops, /ops   … 運営側の共通処理（自動 import の対象外。各ファイルで明示的に import する。相談者側と同じ名前の関数があるため）
+  /admin          ← 旧・管理側アプリ（凍結。上記の注記を参照）
 /packages
   /shared         ← Supabaseクライアント初期化、共通UIコンポーネント、型定義（データモデル設計から生成）
 /supabase
   /migrations     ← スキーマ定義、RLSポリシー
 ```
 
-npm/pnpm workspacesまたはNuxt Layersで`/packages/shared`を両アプリから参照する。
-
 ## 3. 環境変数
 
-両Vercelプロジェクトに同一の値を設定する。
+Vercelプロジェクト（dial.com-op-dev）に設定する。
 
 | 変数名 | スコープ | 備考 |
 |---|---|---|

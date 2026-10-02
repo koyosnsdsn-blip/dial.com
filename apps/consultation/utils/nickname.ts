@@ -11,7 +11,7 @@
 //     「無効なメールアドレス」として拒否する。そのため、DNSに存在し、かつメールを受け取らないドメインを使う
 //   - dev の既定値は相談者側アプリ自身のホスト名（メールサーバーがないので、誤って誰かに届くことはない）
 //   - 一度決めたら変えないこと。変えると、それまでに登録した利用者がログインできなくなる
-//   - 管理側（apps/admin/server/utils/nickname.ts）と同じ値・同じ計算にすること
+//   - 運営側（server/ops/nickname.ts）と同じ値・同じ計算にすること
 export const NICKNAME_MIN = 2;
 export const NICKNAME_MAX = 20;
 
