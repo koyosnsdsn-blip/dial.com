@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // ダッシュボード・案件一覧（要件 7.1・7.2）
-// - 緊急フラグのある案件を最上位に固定表示し、以降は返信待ちの起点が古い順
+// - 緊急フラグのある案件を最上位に固定表示し、以降は返信待ちの起点が古い順（既定）。列の見出しをクリックすると並べ替えられる
 // - 変更は Supabase Realtime で即時に反映する（ポーリングしない：CLAUDE.md 制約#5）
 // - 返信待ちの経過時間は、サーバーから受け取った起点時刻をもとにブラウザ側で計算する（制約#6）
 // - SLAの期限・残り時間は起算方式が未決のため表示しない（未決事項 No.47）。経過が SLA 時間の半分・4分の3を超えたら色で強調する
@@ -39,6 +39,71 @@ const now = ref(Date.now());
 const filters = reactive({ status: "open", assignee: "all", kind: "all", urgent: false, client: "", from: "", to: "" });
 const clientOptions = ref<ClientOption[]>([]);
 
+// 並べ替え（列の見出しをクリック）。何も選んでいない間は、サーバーが返す順（緊急 → 待たせている順）のまま。
+// 対応中の緊急案件は、どの並べ替えでも最上位に固定する（見落とし防止：要件 7.1）
+type SortKey = "status" | "opened" | "waiting" | "kind" | "assignee" | "rally" | "last";
+// 各列の最初のクリックの向き。時間・件数の列は「新しい／長い／多い」が先、文字の列は五十音順が先
+const FIRST_DIR: Record<SortKey, "asc" | "desc"> = { status: "asc", opened: "desc", waiting: "desc", kind: "asc", assignee: "asc", rally: "asc", last: "desc" };
+const HEADERS: { key: SortKey; label: string }[] = [
+  { key: "status", label: "状態" },
+  { key: "opened", label: "案件（開始日時）" },
+  { key: "waiting", label: "返信待ち" },
+  { key: "kind", label: "種別・クライアント" },
+  { key: "assignee", label: "担当" },
+  { key: "rally", label: "往復（残り）" },
+  { key: "last", label: "最終更新" },
+];
+const sort = reactive<{ key: SortKey | null; dir: "asc" | "desc" }>({ key: null, dir: "desc" });
+function toggleSort(key: SortKey) {
+  if (sort.key !== key) {
+    sort.key = key;
+    sort.dir = FIRST_DIR[key];
+  } else if (sort.dir === FIRST_DIR[key]) {
+    sort.dir = FIRST_DIR[key] === "asc" ? "desc" : "asc";
+  } else {
+    sort.key = null; // 3回目で既定の並びに戻す
+  }
+}
+function sortMark(key: SortKey): string {
+  if (sort.key !== key) return "";
+  return sort.dir === "asc" ? " ▲" : " ▼";
+}
+function ariaSort(key: SortKey): "ascending" | "descending" | "none" {
+  return sort.key !== key ? "none" : sort.dir === "asc" ? "ascending" : "descending";
+}
+// 状態の並び：緊急 → 未返信 → 対応中 → 終了
+function statusRank(c: CaseRow): number {
+  if (c.status !== "open") return 3;
+  if (c.urgent) return 0;
+  return c.awaitingReplySince ? 1 : 2;
+}
+function sortValue(c: CaseRow, key: SortKey): number | string {
+  switch (key) {
+    case "status": return statusRank(c);
+    case "opened": return new Date(c.openedAt).getTime();
+    // 返信待ちの経過時間（長いほど大きい）。返信待ちでない案件は最小
+    case "waiting": return c.status === "open" && c.awaitingReplySince ? now.value - new Date(c.awaitingReplySince).getTime() : -1;
+    case "kind": return c.kind === "corp" ? `1${c.clientName ?? ""}` : "0";
+    case "assignee": return c.assigneeName ?? "\uffff"; // 未割当は最後
+    case "rally": return c.rallyRemaining;
+    case "last": return new Date(c.lastActivityAt).getTime();
+  }
+}
+const sortedCases = computed(() => {
+  const key = sort.key;
+  if (!key) return cases.value;
+  const sign = sort.dir === "asc" ? 1 : -1;
+  return [...cases.value].sort((a, b) => {
+    const au = a.urgent && a.status === "open" ? 0 : 1;
+    const bu = b.urgent && b.status === "open" ? 0 : 1;
+    if (au !== bu) return au - bu;
+    const x = sortValue(a, key);
+    const y = sortValue(b, key);
+    const r = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "ja");
+    return r !== 0 ? sign * r : new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime();
+  });
+});
+
 // 件数は、絞り込みに関係なく全体の状況を表示する（/api/dashboard-summary）
 type Summary = { awaiting: number; urgent: number; unassigned: number; busy: boolean; busyThreshold: number; inquiries: number; deletionFailed: number; deletionPending: number; qaPending: number; qaReports: number; disclosuresOpen: number; reuseWaiting: number };
 const summary = ref<Summary | null>(null);
@@ -74,6 +139,11 @@ async function load() {
   } finally {
     loading.value = false;
   }
+}
+
+// 開始日時（日本時間）。一覧で新しい案件を見分けるための表示
+function formatOpened(iso: string): string {
+  return new Date(iso).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function level(c: CaseRow): string {
@@ -195,18 +265,14 @@ watch(filters, load);
         <table class="cases">
           <thead>
             <tr>
-              <th>状態</th>
-              <th>案件</th>
-              <th>返信待ち</th>
-              <th>種別・クライアント</th>
-              <th>担当</th>
-              <th>往復（残り）</th>
-              <th>最終更新</th>
+              <th v-for="h in HEADERS" :key="h.key" :aria-sort="ariaSort(h.key)">
+                <button type="button" class="sort" @click="toggleSort(h.key)">{{ h.label }}{{ sortMark(h.key) }}</button>
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="c in cases"
+              v-for="c in sortedCases"
               :key="c.caseId"
               :class="{ urgent: c.urgent && c.status === 'open', closed: c.status === 'closed', flash: newlyUrgent.has(c.caseId) }"
             >
@@ -220,7 +286,7 @@ watch(filters, load);
                 <span v-if="c.frequentUse" class="badge restart" title="同じ相談者が短い期間に何度も相談を開始しています（確認の契機）">利用が頻繁</span>
                 <span v-if="c.deletedByUser" class="badge muted" title="利用者本人が削除した相談（やり取りは非表示）">本人が削除</span>
               </td>
-              <td><NuxtLink :to="`/ops/cases/${c.caseId}`">{{ shortId(c.caseId) }}</NuxtLink></td>
+              <td><NuxtLink :to="`/ops/cases/${c.caseId}`">{{ shortId(c.caseId) }}</NuxtLink><span class="sub">{{ formatOpened(c.openedAt) }}</span></td>
               <td :class="['wait', level(c)]">{{ c.status === "open" && c.awaitingReplySince ? formatWaiting(c.awaitingReplySince, now) : "—" }}</td>
               <td>{{ c.kind === "corp" ? c.clientName ?? "企業枠" : "個人" }}<span class="sub">SLA {{ c.slaHours }}h</span></td>
               <td>{{ c.assigneeName ?? (c.mine ? "" : "未割当") }}<span v-if="c.mine" class="mine">{{ c.assigneeName ? "（自分）" : "自分" }}</span></td>
@@ -257,6 +323,9 @@ watch(filters, load);
 table.cases { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); }
 .cases th, .cases td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; white-space: nowrap; }
 .cases th { background: var(--bg); font-weight: 600; color: var(--muted); }
+.cases th button.sort { all: unset; cursor: pointer; font: inherit; color: inherit; }
+.cases th button.sort:hover, .cases th button.sort:focus-visible { color: var(--fg); text-decoration: underline; }
+.cases th[aria-sort="ascending"], .cases th[aria-sort="descending"] { color: var(--fg); }
 .cases tr.urgent td { background: #fdecea; }
 .cases tr.closed td { color: var(--muted); }
 .cases tr.flash td { animation: flash 1s ease-in-out 5; }
