@@ -6,9 +6,9 @@
 // このため /api/portal/ 以下では、cases・messages などを service role でも読まないこと。
 import type { H3Event } from "h3";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { serverSupabaseClient, serverSupabaseUser } from "#supabase/server";
 import { STAFF_SESSION_SECONDS, lastAuthAt } from "../../ops/session";
 import { serviceDb } from "./db";
+import { areaClaims, areaSupabaseClient } from "./session";
 import { loginIdToEmail, roleOfLoginEmail } from "./nickname";
 import { createInviteLink, createResetLink } from "./setupLink";
 
@@ -19,7 +19,7 @@ export type ClientAdminContext = { userId: string; clientId: string; name: strin
 export async function requireClientAdmin(event: H3Event): Promise<ClientAdminContext> {
   let claims: Record<string, any> | null = null;
   try {
-    claims = (await serverSupabaseUser(event)) as Record<string, any> | null;
+    claims = await areaClaims(event, "client");
   } catch {
     claims = null;
   }
@@ -35,7 +35,7 @@ export async function requireClientAdmin(event: H3Event): Promise<ClientAdminCon
     throw createError({ statusCode: 403, statusMessage: "not_client_admin" });
   }
 
-  const client = (await serverSupabaseClient(event)) as unknown as SupabaseClient;
+  const client = areaSupabaseClient(event, "client");
   const { data, error } = await client
     .from("client_admins")
     .select("admin_id, client_id, name, status")

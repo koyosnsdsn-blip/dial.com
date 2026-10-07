@@ -1,3 +1,5 @@
+import { authClient } from "./authClient";
+
 // ログイン中の相談員・運営管理者の情報（/api/me の結果）を画面間で共有する。
 // 判定の正本はサーバー側（server/utils/auth.ts）。ここは表示と画面遷移の判断に使うだけ。
 export type Staff = {
@@ -26,11 +28,12 @@ export async function loadStaff(): Promise<Staff | "mfa" | "forbidden" | "signed
 }
 
 // ログアウト。クライアント管理サイト（/client-admin）からなら /client-admin/login、それ以外は /ops/login へ戻る。
+// ログアウトするのは、いま開いている領域のCookieだけ（相談者側や、もう一方の運営側のログインは残る。アカウント自体が別なので、巻き込まない）。
 // @click に直接渡されるため引数は取らない（クリックのイベントが入ってくる）
 export async function signOut() {
-  const loginPath = useRoute().path.startsWith("/client-admin") ? "/client-admin/login" : "/ops/login";
-  const supabase = useSupabaseClient();
-  await supabase.auth.signOut();
+  const client = useRoute().path.startsWith("/client-admin");
+  const loginPath = client ? "/client-admin/login" : "/ops/login";
+  await authClient(client ? "client" : "ops").auth.signOut();
   useStaff().value = null;
   usePortalAdmin().value = null;
   await navigateTo(loginPath);

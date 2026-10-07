@@ -5,10 +5,12 @@
 // そのため、同じメールアドレスで相談者・相談員・クライアント管理者として別々に登録でき、互いのログインには使えない（未決事項 2.13）。
 // 成功後は必ず MFA の画面へ進み、MFA を通過するまで他の画面は開けない（ops/guard.ts）。
 import { loginIdToEmail } from "../utils/nickname";
+import { authClient } from "../ops/authClient";
 import { usePortalAdmin, useStaff } from "../ops/useStaff";
 
 const props = defineProps<{ role: "staff" | "client_admin" }>();
-const supabase = useSupabaseClient();
+// 運営画面とクライアント管理サイトは、相談者側とは別の認証Cookieを使う（utils/authArea.ts）。同じブラウザで相談者側にも同時にログインできる
+const supabase = authClient(props.role === "staff" ? "ops" : "client");
 const domain = useRuntimeConfig().public.nicknameDomain as string;
 
 const isStaff = props.role === "staff";
@@ -35,10 +37,9 @@ async function submit() {
     return;
   }
   password.value = "";
-  // 同じブラウザで別のアカウントに入り直した場合に、前のアカウントの表示が残らないようにする
+  // 同じ領域で別のアカウントに入り直した場合に、前のアカウントの表示が残らないようにする（相談者側の表示は、別のCookieなので触らない）
   useStaff().value = null;
   usePortalAdmin().value = null;
-  useMe().value = null;
   await navigateTo(isStaff ? "/ops/mfa" : "/client-admin/mfa");
 }
 </script>

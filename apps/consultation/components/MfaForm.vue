@@ -4,11 +4,12 @@
 // - 登録済み → 6桁コードを入力
 // どちらも成功するとセッションが aal2 に上がり、管理画面を開けるようになる。
 // 運営画面（/ops/mfa）とクライアント管理サイト（/client-admin/mfa）で共通。ログイン画面と同じく、役割ごとにページを分けている。
+import { authClient } from "../ops/authClient";
 import { signOut } from "../ops/useStaff";
 
 const props = defineProps<{ area: "ops" | "client_admin" }>();
-const supabase = useSupabaseClient();
 const isOps = props.area === "ops";
+const supabase = authClient(isOps ? "ops" : "client");
 
 type Mode = "loading" | "enroll" | "verify" | "failed";
 const mode = ref<Mode>("loading");

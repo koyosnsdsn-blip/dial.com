@@ -4,8 +4,13 @@
 // 設定が済んだら、役割に応じたMFA画面（/ops/mfa または /client-admin/mfa）へ進む。
 // Supabase の招待リンクは、認証後に URL のハッシュ（#access_token=...&type=invite）でセッションを渡してくる。
 // ブラウザ用クライアントは PKCE 方式のためハッシュを自動では読まないので、ここで明示的にセッションへ設定する。
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { roleOfLoginEmail } from "../../utils/nickname";
-const supabase = useSupabaseClient();
+import { authClient } from "../../ops/authClient";
+// 相談員・運営管理者は運営画面用、クライアント管理者はクライアント管理サイト用の認証Cookieを使う（utils/authArea.ts）。
+// どちらの招待かは、リンクのトークンに入っているログインID（メールアドレス）の接頭辞で決める。
+// トークンを読む前（または、リンクを開き直したあと）は、運営画面側を仮に持っておき、セッションがある側に切り替える。
+let supabase: SupabaseClient = authClient("ops");
 const nicknameDomain = useRuntimeConfig().public.nicknameDomain as string;
 
 type Mode = "loading" | "form" | "invalid";
@@ -29,15 +34,36 @@ onMounted(async () => {
     return;
   }
   if (accessToken && refreshToken) {
+    supabase = authClient(areaOfToken(accessToken));
     const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
     if (error) {
       mode.value = "invalid";
       return;
     }
   }
-  const { data } = await supabase.auth.getSession();
+  // リンクを開き直した場合：どちらかの領域に、パスワード設定前のセッションが残っていればそれを使う
+  let { data } = await supabase.auth.getSession();
+  if (!data.session && !accessToken) {
+    const other = authClient("client");
+    const found = (await other.auth.getSession()).data;
+    if (found.session) {
+      supabase = other;
+      data = found;
+    }
+  }
   mode.value = data.session ? "form" : "invalid";
 });
+
+// アクセストークン（JWT）の中のメールアドレスから、領域を決める。読めなければ運営画面側
+function areaOfToken(token: string): "ops" | "client" {
+  try {
+    const part = token.split(".")[1] ?? "";
+    const json = atob(part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "="));
+    return roleOfLoginEmail(JSON.parse(json)?.email, nicknameDomain) === "client_admin" ? "client" : "ops";
+  } catch {
+    return "ops";
+  }
+}
 
 async function submit() {
   errorMessage.value = "";

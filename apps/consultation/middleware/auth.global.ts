@@ -56,7 +56,12 @@ async function checkAccount(): Promise<"ok" | "signed_out" | "staff" | "error"> 
       await useSupabaseClient().auth.signOut().catch(() => {});
       return "signed_out";
     }
-    if (status === 403 && message === "staff_account") return "staff";
+    if (status === 403 && message === "staff_account") {
+      // 認証Cookieを領域ごとに分ける前（2026-10-07 より前）に、運営側のアカウントでログインしたときの残り。
+      // 相談者側のCookieに残っていても使えないので、ブラウザ側だけ消す（scope: local。運営側のログインは別のCookieなので影響しない）
+      await useSupabaseClient().auth.signOut({ scope: "local" }).catch(() => {});
+      return "staff";
+    }
     return "error";
   }
 }

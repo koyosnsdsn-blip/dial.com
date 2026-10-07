@@ -6,11 +6,13 @@
 //
 // 配信範囲は RLS に従う：相談員は担当案件のみ、運営管理者は全案件。MFA未通過のセッションには配信されない。
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { authClient } from "./authClient";
 
 export type RealtimeStatus = "connecting" | "live" | "error";
 
 export function useCaseRealtime(onChange: (kind: "case" | "message", caseId: string | null) => void) {
-  const supabase = useSupabaseClient();
+  // 運営画面の認証Cookie（sb-ops-auth-token）のセッションで購読する
+  const supabase = authClient("ops");
   const status = ref<RealtimeStatus>("connecting");
   let channel: RealtimeChannel | null = null;
 

@@ -1,7 +1,7 @@
 // 管理側サーバーAPIの認可。相談内容系のAPIは必ず冒頭で requireStaff() を呼ぶこと。
 //
 // 検査すること（どれか1つでも欠けたら拒否）：
-//   - Supabase Auth のセッションがある（Cookie）
+//   - Supabase Auth のセッションがある（運営画面用のCookie sb-ops-auth-token。相談者側のCookieは読まない）
 //   - そのセッションが MFA を通過している（JWT の aal が aal2）… 要件 8.8.2
 //   - ログインID（Auth 上のメールアドレス）が、相談員用の識別子（s-…）である … 役割ごとにアカウントを分ける（未決事項 2.13）
 //   - counselors に本人の行があり、status = 'active' … 要件 7.12.1（発行・失効は管理者が行う）
@@ -10,7 +10,7 @@
 // counselors の参照には利用者本人の権限（publishable key＋本人のJWT）を使い、service role キーは使わない。
 // RLS（counselors_select_self_or_admin）により本人の行しか読めないため、ここで他人の情報を誤って返すことはない。
 import type { H3Event } from "h3";
-import { serverSupabaseClient, serverSupabaseUser } from "#supabase/server";
+import { areaClaims, areaSupabaseClient } from "./session";
 import { STAFF_SESSION_SECONDS, lastAuthAt } from "../../ops/session";
 import { roleOfLoginEmail } from "./nickname";
 
@@ -26,7 +26,7 @@ export async function requireStaff(
 ): Promise<StaffContext> {
   let claims: Record<string, any> | null = null;
   try {
-    claims = (await serverSupabaseUser(event)) as Record<string, any> | null;
+    claims = await areaClaims(event, "ops");
   } catch {
     claims = null;
   }
@@ -47,7 +47,7 @@ export async function requireStaff(
     throw createError({ statusCode: 403, statusMessage: "not_staff" });
   }
 
-  const client = await serverSupabaseClient(event);
+  const client = areaSupabaseClient(event, "ops");
   const { data, error } = await client
     .from("counselors")
     .select("counselor_id, name, role, status")

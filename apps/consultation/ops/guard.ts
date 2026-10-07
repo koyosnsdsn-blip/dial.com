@@ -9,7 +9,7 @@
 //
 // 判定の順序（画面の領域ごとに同じ）：
 //   1. その領域の役割でログインしていない、またはログインから8時間を過ぎた → その領域のログイン画面
-//        （別の役割でログイン中のセッションは、ここでは未ログインと同じ扱い。ログインすると入れ替わる）
+//        （領域ごとにCookieが別なので、相談者側など他の領域のログインは影響しない。万一この領域のCookieに別の役割のセッションがあれば、未ログインと同じ扱い）
 //   2. ログイン済みだがMFA未通過（aal1） → その領域のMFA画面（登録済みなら入力、未登録なら登録）
 //   3. MFA通過済みだが、相談員／クライアント管理者として無効 → /ops/forbidden（/client-admin/forbidden）
 //   4. 運営管理者専用の画面に相談員が来た → /ops
@@ -24,6 +24,7 @@ import type { RouteLocationNormalized } from "vue-router";
 import { roleOfLoginEmail } from "../utils/nickname";
 import { loadPortalAdmin, loadStaff, usePortalAdmin, useStaff } from "./useStaff";
 import { staffSessionExpired } from "./session";
+import { authClient } from "./authClient";
 const ADMIN_ONLY = ["/ops/staff", "/ops/audit", "/ops/clients", "/ops/accounts", "/ops/settings", "/ops/templates", "/ops/notices", "/ops/inquiries", "/ops/deletions", "/ops/genres", "/ops/videos", "/ops/disclosures", "/ops/mail-templates", "/ops/auto-texts", "/ops/reuse-consents"];
 
 export async function opsGuard(to: RouteLocationNormalized) {
@@ -35,7 +36,8 @@ export async function opsGuard(to: RouteLocationNormalized) {
     ? { role: "client_admin" as const, home: "/client-admin", login: "/client-admin/login", mfa: "/client-admin/mfa", forbidden: "/client-admin/forbidden" }
     : { role: "staff" as const, home: "/ops", login: "/ops/login", mfa: "/ops/mfa", forbidden: "/ops/forbidden" };
 
-  const supabase = useSupabaseClient();
+  // 領域ごとに別の認証Cookie（運営画面 sb-ops-auth-token／クライアント管理サイト sb-client-auth-token）を読む。相談者側のログインとは独立
+  const supabase = authClient(client ? "client" : "ops");
   const { data } = await supabase.auth.getSession();
   const session = data.session;
   const loginRole = session ? roleOfLoginEmail(session.user.email, useRuntimeConfig().public.nicknameDomain as string) : null;

@@ -8,10 +8,11 @@
 // service role を使う前に、必ず requireStaff() で本人確認し、userDb() で対象へのアクセス権を確認すること。
 import type { H3Event } from "h3";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { serverSupabaseClient } from "#supabase/server";
+import { areaSupabaseClient } from "./session";
 
+// 運営画面・クライアント管理サイトのAPI専用。リクエストのパスから、読む認証Cookie（運営／クライアント管理）を選ぶ（server/ops/session.ts）
 export async function userDb(event: H3Event): Promise<SupabaseClient> {
-  return (await serverSupabaseClient(event)) as unknown as SupabaseClient;
+  return areaSupabaseClient(event);
 }
 
 let serviceClient: SupabaseClient | null = null;
