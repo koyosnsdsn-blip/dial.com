@@ -32,11 +32,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // Q&A の閲覧（投稿を除く）と、クライアント別の入口ページは、ログインしていなくても開ける
   if ((to.path === "/qa" || to.path.startsWith("/qa/")) && to.path !== "/qa/post") return;
   if (to.path.startsWith("/c/")) return;
-  // ログインが必要な画面：ログインしていない、または相談者として使えないセッションなら、ログイン画面へ
-  if (!signedIn) return navigateTo({ path: "/login", query: { reason: "required" } });
+  // ログインが必要な画面：ログインしていない、または相談者として使えないセッションなら、入口を選ぶトップへ
+  if (!signedIn) return navigateTo({ path: "/", query: { reason: "required" } });
   const state = await checkAccount();
-  if (state === "signed_out") return navigateTo({ path: "/login", query: { reason: "expired" } });
-  if (state === "staff") return navigateTo({ path: "/login", query: { reason: "staff" } });
+  if (state === "signed_out") return navigateTo({ path: "/", query: { reason: "expired" } });
+  if (state === "staff") return navigateTo({ path: "/", query: { reason: "staff" } });
 });
 
 // 相談者としてのセッションが使えるかを /api/me で確かめる。取得済みなら使い回す（画面遷移のたびに問い合わせない）

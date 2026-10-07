@@ -2,12 +2,16 @@
 // トップ（ログイン前）。サーバー側で生成する公開ページ。3種類の入口へ案内する。
 // 【仮】文面は暫定。一般向けと企業会員向けの入口の出し分け（要件 8.6.1）、クライアント別ランディングページ（8.6.2）は未実装。
 //      3つの入口のどれを誰に案内するかは未決（未決事項一覧 2.12）
+// ログインが必要な画面に未ログインで来たときも、ここへ戻す（理由は ?reason= で受け取り、案内を出す）
+const reasonMessage = computed(() => loginReasonMessage(useRoute().query.reason));
 </script>
 
 <template>
   <main class="page narrow">
     <h1>ダイヤル.com</h1>
+    <p v-if="reasonMessage" class="notice warn" role="status">{{ reasonMessage }}</p>
     <p>専門の相談員に、メッセージでご相談いただけます。</p>
+    <p class="note">登録済みの方は、登録したときの入口を選ぶとログインできます。</p>
     <div class="entries">
       <NuxtLink class="entry" to="/start/invite">
         <strong>招待コードをお持ちの方</strong>

@@ -21,13 +21,8 @@ const errorMessage = ref("");
 
 const useEmail = computed(() => props.mode === "email");
 
-// ログインが必要な画面から来たときの案内（middleware/auth.global.ts が reason を付ける）
-const REASONS: Record<string, string> = {
-  required: "このページを見るには、ログインが必要です。",
-  expired: "ログインの有効期限が切れました。もう一度ログインしてください。",
-  staff: "いまは運営側のアカウントでログインしています。相談者としてログインすると、このブラウザの運営画面からはログアウトされます。",
-};
-const reasonMessage = computed(() => (typeof route.query.reason === "string" ? REASONS[route.query.reason] ?? "" : ""));
+// ログインが必要な画面から来たときの案内（utils/loginReason.ts）
+const reasonMessage = computed(() => loginReasonMessage(route.query.reason));
 const domain = () => useRuntimeConfig().public.nicknameDomain as string;
 
 watch(tab, () => {

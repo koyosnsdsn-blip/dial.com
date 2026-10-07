@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// ログイン画面のアドレス。ニックネームの入口（登録済みの方）へ案内する。
-// ログインが必要な画面から来たときの理由（reason）は引き継ぐ（components/EntryForm.vue で案内を出す）
+// ログイン画面のアドレス。入口（ニックネーム・招待コード・メールアドレス）は人によって違うため、入口を選ぶトップへ案内する。
+// ログインが必要な画面から来たときの理由（reason）は引き継ぐ（utils/loginReason.ts）
 const reason = useRoute().query.reason;
-await navigateTo({ path: "/start/nickname", query: { tab: "login", ...(typeof reason === "string" ? { reason } : {}) } }, { replace: true });
+await navigateTo({ path: "/", query: typeof reason === "string" ? { reason } : {} }, { replace: true });
 </script>
 
 <template><div></div></template>
