@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { serverSupabaseClient, serverSupabaseUser } from "#supabase/server";
 import { STAFF_SESSION_SECONDS, lastAuthAt } from "../../ops/session";
 import { serviceDb } from "./db";
+import { createInviteLink, createResetLink } from "./setupLink";
 
 export type ClientAdminContext = { userId: string; clientId: string; name: string };
 
@@ -66,26 +67,28 @@ export function requireEmail(value: unknown): string {
   return email;
 }
 
-// クライアント管理者を招待する（Supabase Auth の招待メール → /accept-invite でパスワード設定 → 2段階認証の登録）。
+// クライアント管理者を招待する（パスワード設定用のリンク → /ops/accept-invite でパスワード設定 → 2段階認証の登録）。
+// 【暫定】メールは送らず、リンクを呼び出し側へ返して画面に表示する（server/ops/setupLink.ts）。
 // すでに Auth に登録のあるメールアドレス（相談員・利用者など）は招待できない（役割ごとにアカウントを分ける）。
 // 呼び出し側で、権限の確認と監査ログの記録を先に済ませること。
-export async function inviteClientAdmin(event: H3Event, clientId: string, email: string, name: string): Promise<string> {
+export async function inviteClientAdmin(event: H3Event, clientId: string, email: string, name: string): Promise<{ adminId: string; link: string }> {
   const db = serviceDb(event);
-  const origin = getRequestURL(event).origin;
-  const { data, error } = await db.auth.admin.inviteUserByEmail(email, { redirectTo: `${origin}/ops/accept-invite` });
-  if (error || !data?.user) {
-    const msg = error?.message ?? "";
-    console.error("[client_admin.invite] failed", error?.status, msg);
-    if (/already|registered|exists/i.test(msg)) throw createError({ statusCode: 409, statusMessage: "already_exists" });
-    if (/not authorized|rate limit|smtp|email/i.test(msg)) throw createError({ statusCode: 502, statusMessage: "email_failed" });
-    throw createError({ statusCode: 500, statusMessage: "invite_failed" });
-  }
-  const { error: insertError } = await db.from("client_admins").insert({ admin_id: data.user.id, client_id: clientId, name, email, status: "active" });
+  const { userId, link } = await createInviteLink(event, email, "client_admin.invite");
+  const { error: insertError } = await db.from("client_admins").insert({ admin_id: userId, client_id: clientId, name, email, status: "active" });
   if (insertError) {
     console.error("[client_admin.invite] insert failed", insertError.code);
     throw createError({ statusCode: 500, statusMessage: "update_failed" });
   }
-  return data.user.id;
+  return { adminId: userId, link };
+}
+
+// クライアント管理者に、パスワードを設定し直すリンクを作る。対象が指定のクライアントの有効な管理者であることを確かめる
+export async function clientAdminResetLink(event: H3Event, clientId: string, adminId: string): Promise<string> {
+  const { data, error } = await serviceDb(event).from("client_admins").select("admin_id, status").eq("admin_id", adminId).eq("client_id", clientId).maybeSingle();
+  if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+  if (!data) throw createError({ statusCode: 404, statusMessage: "not_found" });
+  if (data.status !== "active") throw createError({ statusCode: 409, statusMessage: "expired_account" });
+  return createResetLink(event, adminId, "client_admin.reset");
 }
 
 // クライアント管理者の失効・再有効化。有効な管理者が1人もいなくなる変更は、DBのトリガが拒否する。

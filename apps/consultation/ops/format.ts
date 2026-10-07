@@ -79,6 +79,7 @@ export function apiErrorMessage(e: any): string {
     invalid_counselor: "選択した相談員は現在有効ではありません。",
     invalid_email: "メールアドレスの形式が正しくありません。",
     already_exists: "このメールアドレスはすでに登録されています。",
+    expired_account: "失効しているアカウントには発行できません。先に再び有効にしてください。",
     email_failed: "招待メールを送信できませんでした。開発環境では、Supabase の組織メンバーのアドレスにしか送信できません。",
     cannot_change_self: "自分自身の権限・状態は変更できません。",
     last_admin: "有効な運営管理者が1人もいなくなるため、変更できません。",

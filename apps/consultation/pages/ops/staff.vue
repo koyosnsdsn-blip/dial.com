@@ -37,6 +37,9 @@ async function load() {
   }
 }
 
+// 【暫定】パスワード設定用のリンク（メール送信の仕組みが入るまで、メールの代わりに画面へ表示する）
+const setupLink = ref<{ name: string; link: string; note: string } | null>(null);
+
 // 招待
 const invite = reactive({ email: "", name: "", role: "counselor" });
 const inviting = ref(false);
@@ -46,14 +49,31 @@ async function sendInvite() {
   inviteError.value = "";
   message.value = "";
   try {
-    await $fetch<unknown>("/api/ops/staff", { method: "POST", body: { ...invite } });
-    message.value = `${invite.email} に招待メールを送りました。本人がパスワードと2段階認証を設定すると利用できます。`;
+    const res = await $fetch<{ link: string; note: string }>("/api/ops/staff", { method: "POST", body: { ...invite } });
+    setupLink.value = { name: invite.name.trim(), link: res.link, note: res.note };
+    message.value = `${invite.name.trim()} さんを登録しました。下のリンクを本人に渡してください。本人がパスワードと2段階認証を設定すると利用できます。`;
     Object.assign(invite, { email: "", name: "", role: "counselor" });
     await load();
   } catch (e: any) {
     inviteError.value = apiErrorMessage(e);
   } finally {
     inviting.value = false;
+  }
+}
+
+// 【暫定】パスワード設定用のリンクの再発行（招待リンクの期限切れ・パスワード忘れ）。理由は編集欄の「理由」を使う
+const issuing = ref(false);
+async function reissueLink() {
+  if (!current.value) return;
+  issuing.value = true;
+  editError.value = "";
+  try {
+    const res = await $fetch<{ link: string; note: string }>(`/api/ops/staff/${current.value.counselorId}/link`, { method: "POST", body: { reason: form.reason } });
+    setupLink.value = { name: current.value.name, link: res.link, note: res.note };
+  } catch (e: any) {
+    editError.value = apiErrorMessage(e);
+  } finally {
+    issuing.value = false;
   }
 }
 
@@ -105,6 +125,7 @@ onMounted(load);
     <main class="page">
       <h1>相談員の管理</h1>
       <p v-if="message" class="ok" role="status">{{ message }}</p>
+      <SetupLinkBox v-if="setupLink" :name="setupLink.name" :link="setupLink.link" :note="setupLink.note" @close="setupLink = null" />
 
       <p v-if="loading" class="note">読み込み中…</p>
       <p v-else-if="errorMessage" class="error">{{ errorMessage }}</p>
@@ -174,7 +195,11 @@ onMounted(load);
           <button type="button" :disabled="saving || form.reason.trim() === '' || (needsHandover && !form.handoverTo)" @click="save">
             {{ saving ? "保存中…" : "保存する" }}
           </button>
+          <button v-if="current.status === 'active'" class="secondary" type="button" :disabled="issuing || form.reason.trim() === ''" @click="reissueLink">
+            {{ issuing ? "発行中…" : "パスワード設定用のリンクを発行" }}
+          </button>
         </div>
+        <p v-if="current.status === 'active'" class="note">招待のリンクの期限が切れたとき・パスワードを忘れたときに使います（理由が必要です）。2段階認証の登録は消えません。</p>
         <p v-if="editError" class="error" role="alert">{{ editError }}</p>
       </section>
 
@@ -190,11 +215,11 @@ onMounted(load);
             </select>
           </label>
         </div>
-        <button type="button" :disabled="inviting || !invite.email || !invite.name.trim()" @click="sendInvite">{{ inviting ? "送信中…" : "招待メールを送る" }}</button>
+        <button type="button" :disabled="inviting || !invite.email || !invite.name.trim()" @click="sendInvite">{{ inviting ? "登録中…" : "登録して設定用のリンクを発行" }}</button>
         <p v-if="inviteError" class="error" role="alert">{{ inviteError }}</p>
         <p class="note">
-          招待された人は、メールのリンクからパスワードを設定し、続けて2段階認証（認証アプリ）を登録します。<br />
-          開発環境では、Supabase の組織メンバーのアドレスにしか招待メールが届きません（本番はメール配信サービスの設定が必要：未決事項 No.59）。
+          登録すると、パスワード設定用のリンクがこの画面に表示されます。本人に直接渡してください。本人はリンクからパスワードを設定し、続けて2段階認証（認証アプリ）を登録します。<br />
+          【暫定】メールを送る仕組み（未決事項 No.59）が入るまでの運用です。入ったら、リンクはメールで届くようになります。
         </p>
       </section>
     </main>

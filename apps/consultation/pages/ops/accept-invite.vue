@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 招待メールのリンクから開く画面：パスワードを設定し、2段階認証の登録（/mfa）へ進む。
+// 招待・再設定のリンクから開く画面（【暫定】いまはリンクを運営画面に表示して本人に手渡ししている。server/ops/setupLink.ts）：パスワードを設定し、2段階認証の登録（/mfa）へ進む。
 // Supabase の招待リンクは、認証後に URL のハッシュ（#access_token=...&type=invite）でセッションを渡してくる。
 // ブラウザ用クライアントは PKCE 方式のためハッシュを自動では読まないので、ここで明示的にセッションへ設定する。
 const supabase = useSupabaseClient();
@@ -52,7 +52,7 @@ async function submit() {
     errorMessage.value =
       error.code === "weak_password"
         ? "このパスワードは使えません。別のパスワードにしてください。"
-        : "パスワードを設定できませんでした。招待メールのリンクをもう一度開いてください。";
+        : "パスワードを設定できませんでした。リンクの期限が切れている可能性があります。発行した人に、リンクの再発行を依頼してください。";
     return;
   }
   password.value = "";
@@ -68,7 +68,7 @@ async function submit() {
       <p v-if="mode === 'loading'" class="note">確認しています…</p>
       <template v-else-if="mode === 'invalid'">
         <p class="error">招待リンクが無効か、有効期限が切れています。</p>
-        <p class="note">運営管理者に、招待メールの再送を依頼してください。</p>
+        <p class="note">リンクは1回だけ使えて、期限は発行から1時間です。発行した人（運営管理者、またはクライアントの管理者）に、リンクの再発行を依頼してください。</p>
       </template>
       <form v-else @submit.prevent="submit">
         <p class="note">ダイヤル.com 管理画面へようこそ。ログインに使うパスワードを設定してください。続けて2段階認証（認証アプリ）を登録します。</p>

@@ -7,6 +7,7 @@ import { writeAudit } from "../../../ops/audit";
 import { requireStaff } from "../../../ops/auth";
 import { requireText } from "../../../ops/cases";
 import { serviceDb } from "../../../ops/db";
+import { SETUP_LINK_NOTE, createInviteLink } from "../../../ops/setupLink";
 export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event, { adminOnly: true });
   const body = await readBody<{ email?: unknown; name?: unknown; role?: unknown }>(event);
@@ -19,20 +20,13 @@ export default defineEventHandler(async (event) => {
   if (!role) throw createError({ statusCode: 400, statusMessage: "invalid_role" });
 
   const db = serviceDb(event);
-  const origin = getRequestURL(event).origin;
-  const { data, error } = await db.auth.admin.inviteUserByEmail(email, { redirectTo: `${origin}/ops/accept-invite` });
-  if (error || !data?.user) {
-    const msg = error?.message ?? "";
-    console.error("[staff.invite] failed", error?.status, msg);
-    if (/already|registered|exists/i.test(msg)) throw createError({ statusCode: 409, statusMessage: "already_exists" });
-    if (/not authorized|rate limit|smtp|email/i.test(msg)) throw createError({ statusCode: 502, statusMessage: "email_failed" });
-    throw createError({ statusCode: 500, statusMessage: "invite_failed" });
-  }
+  // 【暫定】メールは送らず、パスワード設定用のリンクを作って画面に返す（server/ops/setupLink.ts）
+  const { userId, link } = await createInviteLink(event, email, "staff.invite");
 
-  await writeAudit(event, staff, { action: "staff.invite", targetType: "counselors", targetId: data.user.id, reason: role });
+  await writeAudit(event, staff, { action: "staff.invite", targetType: "counselors", targetId: userId, reason: role });
 
   const { error: insertError } = await db.from("counselors").insert({
-    counselor_id: data.user.id,
+    counselor_id: userId,
     name,
     role,
     status: "active",
@@ -41,5 +35,5 @@ export default defineEventHandler(async (event) => {
     console.error("[staff.invite] counselors insert failed", insertError.code);
     throw createError({ statusCode: 500, statusMessage: "update_failed" });
   }
-  return { counselorId: data.user.id };
+  return { counselorId: userId, link, note: SETUP_LINK_NOTE };
 });

@@ -46,11 +46,22 @@ async function run(fn: () => Promise<string>) {
     busy.value = false;
   }
 }
+// 【暫定】パスワード設定用のリンク（メールを送る仕組みが入るまで、メールの代わりに画面へ表示する）
+const setupLink = ref<{ name: string; link: string; note: string } | null>(null);
 function invite() {
   return run(async () => {
-    await $fetch<unknown>("/api/client-admin/admins", { method: "POST", body: { ...form } });
+    const res = await $fetch<{ link: string; note: string }>("/api/client-admin/admins", { method: "POST", body: { ...form } });
+    setupLink.value = { name: form.name.trim(), link: res.link, note: res.note };
     Object.assign(form, { name: "", email: "" });
-    return "招待メールを送信しました。";
+    return "追加しました。下のリンクを本人に渡してください。";
+  });
+}
+function reissue(a: Admin) {
+  if (!window.confirm(`${a.name} さんのパスワード設定用のリンクを発行します（招待のリンクの期限切れ・パスワード忘れ）。よろしいですか？`)) return;
+  return run(async () => {
+    const res = await $fetch<{ link: string; note: string }>(`/api/client-admin/admins/${a.adminId}/link`, { method: "POST" });
+    setupLink.value = { name: a.name, link: res.link, note: res.note };
+    return "リンクを発行しました。下のリンクを本人に渡してください。";
   });
 }
 function remove(a: Admin) {
@@ -106,6 +117,7 @@ onMounted(load);
 
       <section class="panel">
         <h2>管理者アカウント</h2>
+        <SetupLinkBox v-if="setupLink" :name="setupLink.name" :link="setupLink.link" :note="setupLink.note" @close="setupLink = null" />
         <table v-if="admins.length">
           <thead><tr><th>氏名</th><th>メールアドレス</th><th>状態</th><th>最終利用</th><th></th></tr></thead>
           <tbody>
@@ -115,6 +127,7 @@ onMounted(load);
               <td>{{ a.status === "active" ? "有効" : "削除済み" }}</td>
               <td>{{ a.lastLoginAt ? formatDateTime(a.lastLoginAt) : "未利用" }}</td>
               <td>
+                <button v-if="a.status === 'active' && !a.isSelf" class="secondary small" type="button" :disabled="busy" @click="reissue(a)">リンク再発行</button>
                 <button v-if="a.status === 'active' && !a.isSelf" class="secondary small" type="button" :disabled="busy || activeAdmins.length <= 1" @click="remove(a)">削除</button>
               </td>
             </tr>
@@ -126,8 +139,8 @@ onMounted(load);
             <label>氏名<input v-model="form.name" maxlength="100" autocomplete="off" /></label>
             <label>メールアドレス<input v-model="form.email" type="email" maxlength="254" autocomplete="off" /></label>
           </div>
-          <button type="button" :disabled="busy || form.name.trim() === '' || form.email.trim() === ''" @click="invite">招待メールを送る</button>
-          <p class="note">招待された方は、メールのリンクからパスワードと2段階認証を設定すると、このサイトを使えるようになります。ご自身のアカウントは削除できません。</p>
+          <button type="button" :disabled="busy || form.name.trim() === '' || form.email.trim() === ''" @click="invite">追加して設定用のリンクを発行</button>
+          <p class="note">追加すると、パスワード設定用のリンクが表示されます。本人に直接渡してください。本人がリンクからパスワードと2段階認証を設定すると、このサイトを使えるようになります。ご自身のアカウントは削除できません。</p>
         </template>
       </section>
     </main>
