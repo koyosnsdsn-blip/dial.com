@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
 
   const { data, error } = await db
     .from("cases")
-    .select("case_id, account_id, client_id, status, close_reason, urgent_flag, rally_used, opened_at, last_activity_at, closed_at, awaiting_reply_since, counselor:counselors(name)")
+    .select("case_id, account_id, client_id, status, close_reason, urgent_flag, rally_used, opened_at, last_activity_at, closed_at, awaiting_reply_since, counselor:counselors!fk_cases_counselor(name)")
     .gte("opened_at", range.fromTs)
     .lte("opened_at", range.toTs)
     .order("opened_at", { ascending: true })

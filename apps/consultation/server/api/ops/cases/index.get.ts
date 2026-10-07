@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
 
   let request = (await userDb(event))
     .from("cases")
-    .select("case_id, account_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, counselor_id, counselor:counselors(name)")
+    .select("case_id, account_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, counselor_id, counselor:counselors!fk_cases_counselor(name)")
     .limit(300);
   if (status !== "all") request = request.eq("status", status);
   if (assignee === "me") request = request.eq("counselor_id", staff.userId);

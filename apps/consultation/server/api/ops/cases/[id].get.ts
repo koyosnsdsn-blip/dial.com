@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const { data: row, error } = await db
     .from("cases")
     .select(
-      "case_id, account_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, counselor_id, counselor:counselors(name)",
+      "case_id, account_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, counselor_id, counselor:counselors!fk_cases_counselor(name)",
     )
     .eq("case_id", caseId)
     .maybeSingle();
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
 
   const [{ data: messages, error: msgError }, { data: emergencies, error: emError }, { data: survey, error: svError }] = await Promise.all([
     db.from("messages").select("message_id, sender, body, sent_at").eq("case_id", caseId).is("hidden_at", null).order("sent_at", { ascending: true }),
-    db.from("emergency_records").select("record_id, detection, judgment, action_taken, recorded_at, counselor:counselors(name)").eq("case_id", caseId).order("recorded_at", { ascending: false }),
+    db.from("emergency_records").select("record_id, detection, judgment, action_taken, recorded_at, counselor:counselors!fk_emergency_records_counselor(name)").eq("case_id", caseId).order("recorded_at", { ascending: false }),
     // アンケートの回答（回答時点の設問文・選択肢ラベルの複写。要件 3.11・7.3）
     db.from("case_survey_answers").select("survey_question_id, kind, question_text_snapshot, option_label_snapshot").eq("case_id", caseId),
   ]);
@@ -55,7 +55,7 @@ export default defineEventHandler(async (event) => {
     sdb.from("reply_drafts").select("body, updated_at").eq("case_id", caseId).eq("counselor_id", staff.userId).maybeSingle(),
   ]);
   const [{ data: adjustments }, { count: seq }] = await Promise.all([
-    sdb.from("rally_adjustments").select("delta, reason, adjusted_at, counselor:counselors(name)").eq("case_id", caseId).order("adjusted_at", { ascending: false }),
+    sdb.from("rally_adjustments").select("delta, reason, adjusted_at, counselor:counselors!fk_rally_adjustments_counselor(name)").eq("case_id", caseId).order("adjusted_at", { ascending: false }),
     sdb.from("cases").select("case_id", { count: "exact", head: true }).eq("account_id", r.account_id).lte("opened_at", r.opened_at),
   ]);
 

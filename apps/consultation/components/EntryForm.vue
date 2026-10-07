@@ -20,6 +20,14 @@ const sent = ref(false);
 const errorMessage = ref("");
 
 const useEmail = computed(() => props.mode === "email");
+
+// ログインが必要な画面から来たときの案内（middleware/auth.global.ts が reason を付ける）
+const REASONS: Record<string, string> = {
+  required: "このページを見るには、ログインが必要です。",
+  expired: "ログインの有効期限が切れました。もう一度ログインしてください。",
+  staff: "いまは運営側のアカウントでログインしています。相談者としてログインすると、このブラウザの運営画面からはログアウトされます。",
+};
+const reasonMessage = computed(() => (typeof route.query.reason === "string" ? REASONS[route.query.reason] ?? "" : ""));
 const domain = () => useRuntimeConfig().public.nicknameDomain as string;
 
 watch(tab, () => {
@@ -90,6 +98,7 @@ async function signup() {
       errorMessage.value = "登録は完了しました。ニックネームとパスワードでログインしてください。";
       return;
     }
+    useMe().value = null; // 前のログインの情報を使い回さない
     await navigateTo("/consult");
   } catch (e: any) {
     errorMessage.value = apiErrorMessage(e);
@@ -126,6 +135,7 @@ async function login() {
     }
   }
   busy.value = false;
+  useMe().value = null; // 前のログインの情報を使い回さない
   await navigateTo("/consult");
 }
 </script>
@@ -139,6 +149,7 @@ async function login() {
     </div>
 
     <template v-else>
+      <p v-if="reasonMessage && tab === 'login'" class="notice warn" role="status" style="margin-bottom: 12px">{{ reasonMessage }}</p>
       <div class="tabs" role="tablist">
         <button type="button" role="tab" :aria-selected="tab === 'signup'" :class="{ on: tab === 'signup' }" @click="tab = 'signup'">はじめての方</button>
         <button type="button" role="tab" :aria-selected="tab === 'login'" :class="{ on: tab === 'login' }" @click="tab = 'login'">登録済みの方</button>

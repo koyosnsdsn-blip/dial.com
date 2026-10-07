@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const db = serviceDb(event);
   const { data: q, error } = await db
     .from("questions")
-    .select("question_id, display_id, operator_created, genre_id, body, status, published_at, unpublished_at, unpublish_reason, featured, view_count, hidden_at, source_case_id, answers(answer_id, body, updated_at, counselor:counselors(name)), anonymization_edits(before_text, after_text, edited_at), question_actions(action, reason_code, reason_text, acted_at)")
+    .select("question_id, display_id, operator_created, genre_id, body, status, published_at, unpublished_at, unpublish_reason, featured, view_count, hidden_at, source_case_id, answers(answer_id, body, updated_at, counselor:counselors!fk_answers_counselor(name)), anonymization_edits(before_text, after_text, edited_at), question_actions(action, reason_code, reason_text, acted_at)")
     .eq("question_id", id)
     .maybeSingle();
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });

@@ -21,11 +21,12 @@ begin
   end if;
 
   -- 架空の相談者（ログインはできない：パスワード未設定）
-  insert into auth.users (id, email, aud, role, instance_id, email_confirmed_at)
+  -- トークン系の列は空文字にする（NULL のままだと Supabase Auth の利用者一覧 API が 500 を返す。2026-10-07 に発覚）
+  insert into auth.users (id, email, aud, role, instance_id, email_confirmed_at, confirmation_token, recovery_token, email_change, email_change_token_new)
   values
-    ('dddddddd-0000-4000-8000-000000000a01', 'sample-user1@example.invalid', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000', now()),
-    ('dddddddd-0000-4000-8000-000000000a02', 'sample-user2@example.invalid', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000', now()),
-    ('dddddddd-0000-4000-8000-000000000a03', 'sample-user3@example.invalid', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000', now())
+    ('dddddddd-0000-4000-8000-000000000a01', 'sample-user1@example.invalid', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000', now(), '', '', '', ''),
+    ('dddddddd-0000-4000-8000-000000000a02', 'sample-user2@example.invalid', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000', now(), '', '', '', ''),
+    ('dddddddd-0000-4000-8000-000000000a03', 'sample-user3@example.invalid', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000', now(), '', '', '', '')
   on conflict (id) do nothing;
 
   -- 架空の契約クライアント（企業契約型）

@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event, { adminOnly: true });
   const q = getQuery(event);
   const db = serviceDb(event);
-  let request = db.from("inquiries").select("inquiry_id, account_id, category, body, status, created_at, handled_at, note, handler:counselors(name)").order("created_at", { ascending: false }).limit(200);
+  let request = db.from("inquiries").select("inquiry_id, account_id, category, body, status, created_at, handled_at, note, handler:counselors!inquiries_handled_by_fkey(name)").order("created_at", { ascending: false }).limit(200);
   if (q.status === "open" || q.status === "done") request = request.eq("status", q.status);
   const { data, error } = await request;
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
