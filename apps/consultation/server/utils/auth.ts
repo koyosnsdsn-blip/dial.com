@@ -7,7 +7,7 @@
 // accounts の読み取りは本人の権限（RLS：本人の行のみ）で行い、行の作成だけ service role を使う。
 import type { H3Event } from "h3";
 import { serverSupabaseUser } from "#supabase/server";
-import { isNicknameEmail } from "../../utils/nickname";
+import { isNicknameEmail, roleOfLoginEmail } from "../../utils/nickname";
 
 export type AccountContext = {
   userId: string;
@@ -29,6 +29,13 @@ export async function requireAccount(event: H3Event): Promise<AccountContext> {
     throw createError({ statusCode: 401, statusMessage: "signed_out" });
   }
   const userId = claims.sub as string;
+
+  // ログインIDの接頭辞が相談員（s-）・クライアント管理者（c-）のアカウントは、相談者側を利用できない
+  // （役割ごとにアカウントを分けているため。相談者側に accounts の行が作られることも防ぐ）
+  const loginRole = roleOfLoginEmail(claims.email, useRuntimeConfig(event).public.nicknameDomain as string);
+  if (loginRole === "staff" || loginRole === "client_admin") {
+    throw createError({ statusCode: 403, statusMessage: "staff_account" });
+  }
 
   // 運営側（相談員・運営管理者）のアカウントでは、相談者側を利用できないようにする。
   // 運営側のアカウントは、多要素認証を通過したセッションでしか相談内容を読めない（DBの制約）。

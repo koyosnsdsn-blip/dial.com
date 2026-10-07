@@ -3,6 +3,7 @@
 // 検査すること（どれか1つでも欠けたら拒否）：
 //   - Supabase Auth のセッションがある（Cookie）
 //   - そのセッションが MFA を通過している（JWT の aal が aal2）… 要件 8.8.2
+//   - ログインID（Auth 上のメールアドレス）が、相談員用の識別子（s-…）である … 役割ごとにアカウントを分ける（未決事項 2.13）
 //   - counselors に本人の行があり、status = 'active' … 要件 7.12.1（発行・失効は管理者が行う）
 //   - adminOnly 指定時は role = 'admin'
 //
@@ -11,6 +12,7 @@
 import type { H3Event } from "h3";
 import { serverSupabaseClient, serverSupabaseUser } from "#supabase/server";
 import { STAFF_SESSION_SECONDS, lastAuthAt } from "../../ops/session";
+import { roleOfLoginEmail } from "./nickname";
 
 export type StaffContext = {
   userId: string;
@@ -39,6 +41,10 @@ export async function requireStaff(
   const authAt = lastAuthAt(claims);
   if (authAt === null || Date.now() / 1000 - authAt > STAFF_SESSION_SECONDS) {
     throw createError({ statusCode: 401, statusMessage: "signed_out" });
+  }
+  // ログインIDの接頭辞（s-）が違うアカウントは、counselors に行があっても通さない（役割ごとにアカウントを分けるため）
+  if (roleOfLoginEmail(claims.email, useRuntimeConfig(event).public.nicknameDomain as string) !== "staff") {
+    throw createError({ statusCode: 403, statusMessage: "not_staff" });
   }
 
   const client = await serverSupabaseClient(event);

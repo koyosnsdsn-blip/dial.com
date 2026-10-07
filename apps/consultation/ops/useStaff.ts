@@ -25,15 +25,18 @@ export async function loadStaff(): Promise<Staff | "mfa" | "forbidden" | "signed
   }
 }
 
+// ログアウト。クライアント管理サイト（/client-admin）からなら /client-admin/login、それ以外は /ops/login へ戻る。
+// @click に直接渡されるため引数は取らない（クリックのイベントが入ってくる）
 export async function signOut() {
+  const loginPath = useRoute().path.startsWith("/client-admin") ? "/client-admin/login" : "/ops/login";
   const supabase = useSupabaseClient();
   await supabase.auth.signOut();
   useStaff().value = null;
   usePortalAdmin().value = null;
-  await navigateTo("/ops/login");
+  await navigateTo(loginPath);
 }
 
-// クライアント管理者（クライアント管理サイト /portal の利用者）。相談員・運営管理者とは別の役割で、/portal 以外には入れない。
+// クライアント管理者（クライアント管理サイト /client-admin の利用者）。相談員・運営管理者とは別の役割（別のログインID・別のログイン画面）。
 export type PortalAdmin = {
   userId: string;
   name: string;

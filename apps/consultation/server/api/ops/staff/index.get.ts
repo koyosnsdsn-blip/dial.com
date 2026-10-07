@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
   const db = serviceDb(event);
 
   const [{ data: rows, error }, { data: openCases, error: caseError }] = await Promise.all([
-    db.from("counselors").select("counselor_id, name, role, status, absent_from, absent_to").order("name"),
+    db.from("counselors").select("counselor_id, name, role, status, contact_email, absent_from, absent_to").order("name"),
     db.from("cases").select("counselor_id").eq("status", "open").not("counselor_id", "is", null),
   ]);
   if (error || caseError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
@@ -65,7 +65,8 @@ export default defineEventHandler(async (event) => {
       name: r.name as string,
       role: r.role as "admin" | "counselor",
       status: r.status as "active" | "expired",
-      email: u?.email ?? null,
+      // Auth 上のアドレスは内部用の識別子なので、連絡先（本物のメールアドレス）を返す
+      email: (r.contact_email as string | null) ?? null,
       lastSignInAt: u?.last_sign_in_at ?? null,
       invited: Boolean(u && !u.last_sign_in_at),
       absentFrom: r.absent_from as string | null,

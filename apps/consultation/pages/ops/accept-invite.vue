@@ -1,8 +1,12 @@
 <script setup lang="ts">
 // 招待・再設定のリンクから開く画面（【暫定】いまはリンクを運営画面に表示して本人に手渡ししている。server/ops/setupLink.ts）：パスワードを設定し、2段階認証の登録（/mfa）へ進む。
+// 招待されたアカウントの役割（相談員・運営管理者／クライアント管理者）は、ログインID（Auth 上のメールアドレス）の接頭辞で分かる。
+// 設定が済んだら、役割に応じたMFA画面（/ops/mfa または /client-admin/mfa）へ進む。
 // Supabase の招待リンクは、認証後に URL のハッシュ（#access_token=...&type=invite）でセッションを渡してくる。
 // ブラウザ用クライアントは PKCE 方式のためハッシュを自動では読まないので、ここで明示的にセッションへ設定する。
+import { roleOfLoginEmail } from "../../utils/nickname";
 const supabase = useSupabaseClient();
+const nicknameDomain = useRuntimeConfig().public.nicknameDomain as string;
 
 type Mode = "loading" | "form" | "invalid";
 const mode = ref<Mode>("loading");
@@ -57,7 +61,9 @@ async function submit() {
   }
   password.value = "";
   password2.value = "";
-  await navigateTo("/ops/mfa");
+  const { data } = await supabase.auth.getSession();
+  const role = roleOfLoginEmail(data.session?.user.email, nicknameDomain);
+  await navigateTo(role === "client_admin" ? "/client-admin/mfa" : "/ops/mfa");
 }
 </script>
 
@@ -71,7 +77,7 @@ async function submit() {
         <p class="note">リンクは1回だけ使えて、期限は発行から1時間です。発行した人（運営管理者、またはクライアントの管理者）に、リンクの再発行を依頼してください。</p>
       </template>
       <form v-else @submit.prevent="submit">
-        <p class="note">ダイヤル.com 管理画面へようこそ。ログインに使うパスワードを設定してください。続けて2段階認証（認証アプリ）を登録します。</p>
+        <p class="note">ダイヤル.com へようこそ。ログインに使うパスワードを設定してください。続けて2段階認証（認証アプリ）を登録します。</p>
         <label for="pw">パスワード（8文字以上）</label>
         <input id="pw" v-model="password" type="password" autocomplete="new-password" minlength="8" required />
         <label for="pw2">パスワード（確認）</label>

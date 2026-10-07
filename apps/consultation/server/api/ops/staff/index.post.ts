@@ -7,6 +7,7 @@ import { writeAudit } from "../../../ops/audit";
 import { requireStaff } from "../../../ops/auth";
 import { requireText } from "../../../ops/cases";
 import { serviceDb } from "../../../ops/db";
+import { loginIdToEmail } from "../../../ops/nickname";
 import { SETUP_LINK_NOTE, createInviteLink } from "../../../ops/setupLink";
 export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event, { adminOnly: true });
@@ -20,8 +21,11 @@ export default defineEventHandler(async (event) => {
   if (!role) throw createError({ statusCode: 400, statusMessage: "invalid_role" });
 
   const db = serviceDb(event);
+  // Auth には、メールアドレスから作った内部用の識別子（s-…）で登録する。本物のメールアドレスは counselors.contact_email に持つ。
+  // 役割ごとに識別子が違うので、同じメールアドレスの相談者・クライアント管理者がいても重複にならない。
   // 【暫定】メールは送らず、パスワード設定用のリンクを作って画面に返す（server/ops/setupLink.ts）
-  const { userId, link } = await createInviteLink(event, email, "staff.invite");
+  const loginEmail = loginIdToEmail("staff", email, useRuntimeConfig(event).public.nicknameDomain as string);
+  const { userId, link } = await createInviteLink(event, loginEmail, "staff.invite");
 
   await writeAudit(event, staff, { action: "staff.invite", targetType: "counselors", targetId: userId, reason: role });
 
@@ -30,6 +34,7 @@ export default defineEventHandler(async (event) => {
     name,
     role,
     status: "active",
+    contact_email: email,
   });
   if (insertError) {
     console.error("[staff.invite] counselors insert failed", insertError.code);

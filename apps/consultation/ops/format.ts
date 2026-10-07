@@ -78,7 +78,7 @@ export function apiErrorMessage(e: any): string {
     below_used: "使用済みの往復回数を下回る上限にはできません。",
     invalid_counselor: "選択した相談員は現在有効ではありません。",
     invalid_email: "メールアドレスの形式が正しくありません。",
-    already_exists: "このメールアドレスはすでに登録されています。",
+    already_exists: "このメールアドレスは、この役割ではすでに登録されています（相談員・クライアント管理者・相談者は別々のアカウントのため、他の役割で登録済みでも、ここでは重複になりません）。",
     expired_account: "失効しているアカウントには発行できません。先に再び有効にしてください。",
     email_failed: "招待メールを送信できませんでした。開発環境では、Supabase の組織メンバーのアドレスにしか送信できません。",
     cannot_change_self: "自分自身の権限・状態は変更できません。",

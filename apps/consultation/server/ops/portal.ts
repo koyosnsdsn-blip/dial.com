@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { serverSupabaseClient, serverSupabaseUser } from "#supabase/server";
 import { STAFF_SESSION_SECONDS, lastAuthAt } from "../../ops/session";
 import { serviceDb } from "./db";
+import { loginIdToEmail, roleOfLoginEmail } from "./nickname";
 import { createInviteLink, createResetLink } from "./setupLink";
 
 export type ClientAdminContext = { userId: string; clientId: string; name: string };
@@ -28,6 +29,10 @@ export async function requireClientAdmin(event: H3Event): Promise<ClientAdminCon
   const authAt = lastAuthAt(claims);
   if (authAt === null || Date.now() / 1000 - authAt > STAFF_SESSION_SECONDS) {
     throw createError({ statusCode: 401, statusMessage: "signed_out" });
+  }
+  // ログインIDの接頭辞（c-）が違うアカウントは、client_admins に行があっても通さない（役割ごとにアカウントを分けるため）
+  if (roleOfLoginEmail(claims.email, useRuntimeConfig(event).public.nicknameDomain as string) !== "client_admin") {
+    throw createError({ statusCode: 403, statusMessage: "not_client_admin" });
   }
 
   const client = (await serverSupabaseClient(event)) as unknown as SupabaseClient;
@@ -69,11 +74,13 @@ export function requireEmail(value: unknown): string {
 
 // クライアント管理者を招待する（パスワード設定用のリンク → /ops/accept-invite でパスワード設定 → 2段階認証の登録）。
 // 【暫定】メールは送らず、リンクを呼び出し側へ返して画面に表示する（server/ops/setupLink.ts）。
-// すでに Auth に登録のあるメールアドレス（相談員・利用者など）は招待できない（役割ごとにアカウントを分ける）。
+// Auth には、メールアドレスから作った内部用の識別子（c-…）で登録する。本物のメールアドレスは client_admins.email に持つ。
+// 役割ごとに識別子が違うので、同じメールアドレスの相談者・相談員がいても重複にならない（同じ役割で二重に登録しようとしたときだけ already_exists）。
 // 呼び出し側で、権限の確認と監査ログの記録を先に済ませること。
 export async function inviteClientAdmin(event: H3Event, clientId: string, email: string, name: string): Promise<{ adminId: string; link: string }> {
   const db = serviceDb(event);
-  const { userId, link } = await createInviteLink(event, email, "client_admin.invite");
+  const loginEmail = loginIdToEmail("client_admin", email, useRuntimeConfig(event).public.nicknameDomain as string);
+  const { userId, link } = await createInviteLink(event, loginEmail, "client_admin.invite");
   const { error: insertError } = await db.from("client_admins").insert({ admin_id: userId, client_id: clientId, name, email, status: "active" });
   if (insertError) {
     console.error("[client_admin.invite] insert failed", insertError.code);
