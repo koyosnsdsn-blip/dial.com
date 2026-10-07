@@ -8,7 +8,11 @@ export type Me = {
   features: { qa: boolean; qaFull: boolean; qaPost: boolean; video: boolean };
   personal: boolean;
   contractType: "corp" | "muni" | null;
+  // 対応中の相談（枠ごとに1件まで。最大2件）。free＝無償の個人の相談
+  openCases: { caseId: string; free: boolean; openedAt: string }[];
   openCaseId: string | null;
+  // 新しい相談を始められるか（対応中の相談があっても、枠が別なら始められる）
+  canStart: boolean;
   unreadCaseId: string | null;
 };
 

@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
     // 自治体委託型は、委託元へ報告される旨を画面に常時表示する（要件 3.12.4）
     contractType: ((client as any)?.contract_type as "corp" | "muni" | undefined) ?? null,
     // 終了後の画面から新しい相談を始められるか（要件 3.4.2）
-    canRestart: c.status === "closed" && m.canConsult,
+    canRestart: c.status === "closed" && canStartNew(m, await openCasesOf(event)),
     messages: (messages ?? []).map((x: any) => ({
       messageId: x.message_id as string,
       sender: x.sender as "user" | "counselor",

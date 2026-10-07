@@ -56,6 +56,7 @@ const closeReasonLabel: Record<string, string> = {
   expiry: "有効期間の満了",
   idle: "無操作による自動終了",
   manual: "相談員による対応完了",
+  user: "利用者本人による終了",
 };
 export function formatCloseReason(reason: string | null | undefined): string {
   return reason ? closeReasonLabel[reason] ?? reason : "—";

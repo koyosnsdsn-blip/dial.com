@@ -5,6 +5,10 @@
 const me = useMe();
 const loading = ref(true);
 const errorMessage = ref("");
+// 返信が届いている相談以外の、対応中の相談（枠ごとに1件まで。最大2件）
+const openRows = computed(() => (me.value?.openCases ?? []).filter((c) => c.caseId !== me.value?.unreadCaseId));
+// 対応中の相談が残ったまま、新しい相談を始められる状態（招待コードで所属した直後など）
+const leftover = computed(() => (me.value?.canStart ? me.value.openCases.find((c) => c.free) ?? null : null));
 
 onMounted(async () => {
   try {
@@ -29,16 +33,20 @@ onMounted(async () => {
           <h2>相談員からお返事が届いています</h2>
           <NuxtLink class="button" :to="`/consult/${me.unreadCaseId}`">お返事を読む</NuxtLink>
         </div>
-        <div v-else-if="me.openCaseId" class="card stack">
+        <div v-for="c in openRows" :key="c.caseId" class="card stack">
           <h2>対応中のご相談があります</h2>
+          <p v-if="me.openCases.length > 1" class="note">{{ formatDate(c.openedAt) }} に始めたご相談です。</p>
           <p class="note">相談員からのお返事をお待ちください。お返事が届くと、この画面でお知らせします（メールなどでのお知らせはありません）。</p>
-          <NuxtLink class="button" :to="`/consult/${me.openCaseId}`">メッセージを開く</NuxtLink>
+          <NuxtLink class="button" :to="`/consult/${c.caseId}`">メッセージを開く</NuxtLink>
         </div>
-        <div v-else-if="me.canConsult" class="card stack">
+        <OpenCaseNotice v-if="leftover" :case-id="leftover.caseId" where="home" />
+        <div v-else-if="me.canStart" class="card stack">
           <h2>相談員にメッセージで相談する</h2>
           <p>はじめに、いくつかの質問（選択式）にお答えいただきます。</p>
           <NuxtLink class="button" to="/consult/start">相談をはじめる</NuxtLink>
         </div>
+        <!-- 同じ枠の相談が対応中のときは、上の「対応中のご相談」だけを表示する -->
+        <template v-else-if="me.canConsult" />
         <div v-else-if="!me.linked" class="card stack">
           <h2>招待コードをお持ちの方</h2>
           <p>勤務先などから案内された招待コードを登録すると、ご相談を始められます。</p>

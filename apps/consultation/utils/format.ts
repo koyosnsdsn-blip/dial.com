@@ -42,6 +42,7 @@ export const ACCENT_COLORS: Record<string, string> = {
 const closeReasonShort: Record<string, string> = {
   rally: "やり取りが一区切りとなりました",
   manual: "対応が一区切りとなりました",
+  user: "ご自身で終了しました",
   idle: "しばらくやり取りがなかったため終了しました",
   expiry: "有効期間が満了しました",
 };
@@ -51,6 +52,7 @@ export function formatCloseReason(reason: string | null | undefined): string {
 const closeReasonLong: Record<string, string> = {
   rally: "今回のご相談のやり取りは、ここで一区切りとなりました。",
   manual: "担当が、今回のご相談への対応を一区切りとしました。",
+  user: "このご相談は、ご自身で終了しました。",
   idle: "しばらくやり取りがなかったため、このご相談は終了しました。",
   expiry: "有効期間が満了したため、このご相談は終了しました。",
 };

@@ -136,6 +136,24 @@ async function deleteCase() {
   }
 }
 
+// 相談の終了（本人による。2026-10-07 入江さんの指示）。二段階で確認する
+const closeStep = ref<"" | "confirm">("");
+const closing = ref(false);
+const closeError = ref("");
+async function closeCase() {
+  closing.value = true;
+  closeError.value = "";
+  try {
+    await $fetch<unknown>(`/api/cases/${caseId.value}/close`, { method: "POST" });
+    closeStep.value = "";
+    await Promise.all([load(true), loadMe()]);
+  } catch (e: any) {
+    closeError.value = apiErrorMessage(e);
+  } finally {
+    closing.value = false;
+  }
+}
+
 // 添付する画像（1通につき3枚まで）
 const MAX_IMAGES = 3;
 const images = ref<{ blob: Blob; url: string }[]>([]);
@@ -276,6 +294,19 @@ async function send() {
           <p v-if="sendError" class="error" role="alert">{{ sendError }}</p>
           <button type="submit" :disabled="sending || (draft.trim().length === 0 && images.length === 0)">{{ sending ? "送信中…" : "送信する" }}</button>
         </form>
+        <section v-if="detail.status === 'open'" class="end">
+          <button v-if="closeStep === ''" type="button" class="plain" @click="closeStep = 'confirm'">このご相談を終了する</button>
+          <div v-else class="card stack">
+            <p><strong>このご相談を終了します。</strong></p>
+            <p class="note">
+              終了すると、このご相談には、これ以上メッセージを送れなくなります。お話ししたいことが残っているときや、お返事をお待ちのときは、終了せずにそのままにしておいてください。
+              終了したあとも、やり取りは履歴からいつでも読み返せます。新しいご相談も、いつでも始められます。
+            </p>
+            <p v-if="closeError" class="error" role="alert">{{ closeError }}</p>
+            <button type="button" class="danger" :disabled="closing" @click="closeCase">{{ closing ? "終了しています…" : "終了する" }}</button>
+            <button type="button" class="secondary" :disabled="closing" @click="closeStep = ''">やめる</button>
+          </div>
+        </section>
         <section v-if="detail.reuseRequested || reuseDone" class="card stack reuse">
           <template v-if="detail.reuseRequested">
             <h2>運営からのお願い</h2>
@@ -345,7 +376,7 @@ time { display: block; text-align: right; font-size: 0.75rem; color: var(--muted
 .attach input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .attach input:focus-visible + span { outline: 3px solid #7fb9b4; outline-offset: 2px; }
 .reuse { margin-top: 20px; }
-.delete { margin-top: 28px; text-align: center; }
-.delete .card { text-align: left; }
+.delete, .end { margin-top: 28px; text-align: center; }
+.delete .card, .end .card { text-align: left; }
 button.danger { background: var(--danger); border-color: var(--danger); }
 </style>

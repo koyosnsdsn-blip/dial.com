@@ -11,6 +11,7 @@ type Message = { messageId: string; sender: "user" | "counselor"; body: string; 
 type CaseDetail = {
   caseId: string;
   seq: number;
+  otherOpenCases: { caseId: string; openedAt: string; assigneeName: string | null; link: boolean }[];
   quickRestart: boolean;
   quickRestartDays: number;
   clientName: string | null;
@@ -336,6 +337,16 @@ onBeforeUnmount(() => clock && clearInterval(clock));
         <div v-if="detail.deletedByUser" class="deleted-banner" role="status">
           この相談は、利用者本人が {{ formatDateTime(detail.deletedByUser.requestedAt) }} に削除しました。やり取りは非表示になっています<template v-if="detail.deletedByUser.purgeAfter">（{{ formatDateTime(detail.deletedByUser.purgeAfter) }} 以降に完全に消去する予定）</template>。
         </div>
+        <p v-if="detail.otherOpenCases.length > 0" class="guard" role="status">
+          この相談者は、ほかにも対応中の案件があります：
+          <template v-for="(o, i) in detail.otherOpenCases" :key="o.caseId">
+            <template v-if="i > 0">、</template>
+            <NuxtLink v-if="o.link" :to="`/ops/cases/${o.caseId}`">案件 {{ shortId(o.caseId) }}</NuxtLink>
+            <template v-else>案件 {{ shortId(o.caseId) }}</template>
+            （{{ formatDateTime(o.openedAt) }} 開始・担当 {{ o.assigneeName ?? "未割当" }}）
+          </template>。
+          同じ相談者から並行して届いているため、それぞれの内容を踏まえて対応してください。
+        </p>
         <p v-if="detail.frequentUse || detail.repeatedAdjustments" class="guard" role="status">
           <template v-if="detail.frequentUse">この相談者は、{{ detail.frequentNote }}の相談を開始しています。</template>
           <template v-if="detail.repeatedAdjustments">この案件では、往復回数の調整が繰り返されています。</template>

@@ -54,9 +54,17 @@ export default defineEventHandler(async (event) => {
     // 自分の返信の下書き（要件 7.3）
     sdb.from("reply_drafts").select("body, updated_at").eq("case_id", caseId).eq("counselor_id", staff.userId).maybeSingle(),
   ]);
-  const [{ data: adjustments }, { count: seq }] = await Promise.all([
+  const [{ data: adjustments }, { count: seq }, { data: others }] = await Promise.all([
     sdb.from("rally_adjustments").select("delta, reason, adjusted_at, counselor:counselors!fk_rally_adjustments_counselor(name)").eq("case_id", caseId).order("adjusted_at", { ascending: false }),
     sdb.from("cases").select("case_id", { count: "exact", head: true }).eq("account_id", r.account_id).lte("opened_at", r.opened_at),
+    // 同じ相談者の、ほかの対応中の案件（無償の個人の相談と、企業枠・有料の相談が並行するとき）。終了済みの案件は経緯サマリの対象で、ここには出さない
+    sdb
+      .from("cases")
+      .select("case_id, opened_at, counselor_id, counselor:counselors!fk_cases_counselor(name)")
+      .eq("account_id", r.account_id)
+      .eq("status", "open")
+      .neq("case_id", caseId)
+      .order("opened_at", { ascending: true }),
   ]);
 
   await writeAudit(event, staff, { action: "case.view", targetType: "cases", targetId: caseId });
@@ -65,6 +73,13 @@ export default defineEventHandler(async (event) => {
   return {
     caseId: r.case_id as string,
     seq: seq ?? 1,
+    // 同じ相談者の、ほかの対応中の案件。担当外の案件は開けない（link=false）。本文は返さない
+    otherOpenCases: (others ?? []).map((o: any) => ({
+      caseId: o.case_id as string,
+      openedAt: o.opened_at as string,
+      assigneeName: (o.counselor?.name as string | undefined) ?? null,
+      link: o.counselor_id === staff.userId || staff.role === "admin",
+    })),
     // 前回の終了から短期間での再開か（支援の要否を判断するための情報。要件 3.4.2）
     quickRestart: restart.has(caseId),
     quickRestartDays: settings.quick_restart_days!,

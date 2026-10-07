@@ -120,6 +120,7 @@ const ACTIONS: Record<string, { label: string; important?: boolean }> = {
   "case.delete": { label: "相談内容の削除（利用者）", important: true },
   "data.export": { label: "自身のデータの出力（利用者）", important: true },
   "case.start": { label: "相談の開始（利用者）" },
+  "case.close.user": { label: "相談の終了（利用者本人）" },
   "client.link": { label: "招待コードによる所属の登録（利用者）" },
   "client.link.failed": { label: "招待コードの入力失敗（利用者）" },
   "attribute.update": { label: "属性の修正（利用者）" },

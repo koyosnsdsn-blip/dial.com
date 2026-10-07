@@ -14,6 +14,10 @@ const muniConsent = ref(false);
 const loading = ref(true);
 const busy = ref(false);
 const errorMessage = ref("");
+// 対応中の相談が残ったまま新しい相談を始めようとしているとき（招待コードで所属した直後など）の案内
+const meState = useMe();
+const leftover = computed(() => (meState.value?.canStart ? meState.value.openCases.find((c) => c.free) ?? null : null));
+const noticeDismissed = ref(false);
 
 const remaining = computed(() => (survey.value?.questions ?? []).filter((q) => !answers[q.questionId]).length);
 const needsConsent = computed(() => survey.value?.contractType === "muni");
@@ -22,7 +26,8 @@ const canStart = computed(() => remaining.value === 0 && (!needsConsent.value ||
 onMounted(async () => {
   try {
     const me = await loadMe();
-    if (me.openCaseId) {
+    // 新しい相談を始められないとき（同じ枠の相談が対応中）だけ、その相談へ案内する
+    if (!me.canStart && me.openCaseId) {
       await navigateTo(`/consult/${me.openCaseId}`, { replace: true });
       return;
     }
@@ -58,6 +63,12 @@ async function start() {
       <h1>相談をはじめる</h1>
       <p v-if="loading" class="note">読み込んでいます…</p>
       <template v-else-if="survey">
+        <OpenCaseNotice
+          v-if="leftover && !noticeDismissed"
+          :case-id="leftover.caseId"
+          where="start"
+          @dismiss="noticeDismissed = true"
+        />
         <div class="card">
           <h2>はじめにお読みください</h2>
           <template v-if="survey.contractType === 'muni'">

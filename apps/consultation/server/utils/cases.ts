@@ -5,12 +5,14 @@ import type { AccountContext } from "./auth";
 export type OwnCase = {
   case_id: string;
   status: "open" | "closed";
-  close_reason: "rally" | "expiry" | "idle" | "manual" | null;
+  close_reason: "rally" | "expiry" | "idle" | "manual" | "user" | null;
   opened_at: string;
   closed_at: string | null;
   client_id: string | null;
   continuity: "same" | "changed" | null;
   idle_close_at: string | null;
+  // 同時に対応中にできる枠。free＝無償の個人、main＝企業枠・有料の個人（枠ごとに対応中は1件まで）
+  slot: "free" | "main";
 };
 
 // 本人の案件であることを確認する。本人の権限で、ビュー my_cases（本人の行・見せてよい列のみ）から読む。
@@ -19,12 +21,31 @@ export type OwnCase = {
 export async function requireOwnCase(event: H3Event, account: AccountContext, caseId: string): Promise<OwnCase> {
   const { data, error } = await (await userDb(event))
     .from("my_cases")
-    .select("case_id, status, close_reason, opened_at, closed_at, client_id, continuity, idle_close_at")
+    .select("case_id, status, close_reason, opened_at, closed_at, client_id, continuity, idle_close_at, slot")
     .eq("case_id", caseId)
     .maybeSingle();
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
   if (!data) throw createError({ statusCode: 404, statusMessage: "not_found" });
   return data as OwnCase;
+}
+
+// 対応中の相談と、新しい相談を始められるかどうか（画面の出し分けに使う。判定の正本は DB 関数 user_start_case）
+// - 同時に対応中にできるのは枠ごとに1件まで。無償の個人の相談（free）が対応中でも、企業枠（main）の相談は始められる
+// - 無償の個人（所属なし）は、何かが対応中のあいだは始められない
+export type OpenCase = { caseId: string; free: boolean; openedAt: string };
+export async function openCasesOf(event: H3Event): Promise<OpenCase[]> {
+  const { data, error } = await (await userDb(event))
+    .from("my_cases")
+    .select("case_id, slot, opened_at")
+    .eq("status", "open")
+    .order("opened_at", { ascending: true });
+  if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+  return (data ?? []).map((r: any) => ({ caseId: r.case_id as string, free: r.slot === "free", openedAt: r.opened_at as string }));
+}
+export function canStartNew(m: { canConsult: boolean; personalFree: boolean }, open: OpenCase[]): boolean {
+  if (!m.canConsult) return false;
+  if (m.personalFree) return open.length === 0;
+  return !open.some((c) => !c.free);
 }
 
 // DB関数の例外（raise exception 'xxx'）を HTTP エラーに変換する
