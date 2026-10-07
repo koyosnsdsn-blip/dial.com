@@ -140,6 +140,8 @@ async function login() {
     <div v-if="sent" class="card">
       <p><strong>確認メールをお送りしました。</strong></p>
       <p>メールに記載のリンクを開くと、登録が完了します。届かない場合は、迷惑メールのフォルダもご確認ください。</p>
+      <!-- 登録済みのアドレスでも同じ画面を出す（登録の有無を第三者に推測させない）。そのため、全員に同じ文言で「登録済みの可能性」を案内する -->
+      <p class="note">しばらく待ってもメールが届かない場合は、このメールアドレスですでに登録されているかもしれません。「登録済みの方」からログインするか、<NuxtLink to="/forgot">パスワードの再設定</NuxtLink>をお試しください。</p>
       <button type="button" class="secondary" @click="(sent = false), (tab = 'login')">ログインへ</button>
     </div>
 

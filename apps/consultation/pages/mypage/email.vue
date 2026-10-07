@@ -24,9 +24,13 @@ async function submit() {
   errorMessage.value = "";
   const { error } = await supabase.auth.updateUser({ email: email.value.trim() }, { emailRedirectTo: `${window.location.origin}/confirm` });
   busy.value = false;
+  // ほかの方が登録しているアドレスでも、確認メールを送ったときと同じ画面にする（そのアドレスが登録済みかどうかを推測させない）
+  if (error?.code === "email_exists") {
+    sent.value = true;
+    return;
+  }
   if (error) {
     if (error.status === 429) errorMessage.value = "ただいま確認メールを送信できません。しばらく時間をおいてから、もう一度お試しください。";
-    else if (error.code === "email_exists") errorMessage.value = "このメールアドレスは使用できません。別のアドレスをお試しください。";
     else errorMessage.value = "変更の手続きを開始できませんでした。入力内容をお確かめください。";
     return;
   }
@@ -42,6 +46,7 @@ async function submit() {
       <div v-if="sent" class="card">
         <p><strong>確認メールをお送りしました。</strong></p>
         <p>メールに記載のリンクを開くと、変更が完了します。それまでは、今のメールアドレスでログインしてください。</p>
+        <p class="note">しばらく待ってもメールが届かない場合は、そのメールアドレスは使えない可能性があります。別のアドレスでお試しください。</p>
         <NuxtLink class="button secondary" to="/mypage">マイページへ戻る</NuxtLink>
       </div>
       <form v-else class="card" @submit.prevent="submit">
