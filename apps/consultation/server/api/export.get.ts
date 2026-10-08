@@ -60,6 +60,9 @@ export default defineEventHandler(async (event) => {
   if (postError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
   const postStatus: Record<string, string> = { pending: "確認中", published: "公開", rejected: "公開されませんでした", discarded: "公開されませんでした", merged: "すでにある Q&A をご案内" };
 
+  // 通知用のメールアドレス（ニックネームで登録した方が任意で登録したもの）
+  const { data: notify } = await sdb.from("account_notify_emails").select("email, verified_at").eq("account_id", account.userId).maybeSingle();
+
   await writeAudit(event, account, { action: "data.export", targetType: "accounts", targetId: account.userId });
 
   const closeReason: Record<string, string> = {
@@ -73,7 +76,7 @@ export default defineEventHandler(async (event) => {
   const data = {
     出力日時: new Date().toISOString(),
     登録情報: isNicknameEmail(own?.email ?? account.email, useRuntimeConfig(event).public.nicknameDomain as string)
-      ? { ニックネーム: account.nickname, 登録日時: own?.created_at ?? null }
+      ? { ニックネーム: account.nickname, 通知用メールアドレス: notify ? `${notify.email}（${notify.verified_at ? "確認済み" : "確認前"}）` : null, 登録日時: own?.created_at ?? null }
       : { メールアドレス: own?.email ?? account.email, 登録日時: own?.created_at ?? null },
     属性の回答: (attrRows ?? []).map((a: any) => ({
       設問: a.question_text_snapshot,

@@ -110,6 +110,8 @@ const ACTIONS: Record<string, { label: string; important?: boolean }> = {
   "deletion.retry": { label: "削除の再実行", important: true },
   "case.purge": { label: "削除された相談内容の消去（システム）", important: true },
   "account.withdraw": { label: "退会（利用者）", important: true },
+  "account.notify_email.set": { label: "通知用メールアドレスの登録・変更（利用者）" },
+  "account.notify_email.delete": { label: "通知用メールアドレスの削除（利用者）" },
   "inquiry.create": { label: "問い合わせの送信（利用者）" },
   "export.cases": { label: "CSV出力：案件明細", important: true },
   "export.survey": { label: "CSV出力：アンケート回答明細", important: true },

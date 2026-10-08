@@ -47,7 +47,7 @@ function stopAll() {
       <p v-else-if="errorMessage && !settings" class="error" role="alert">{{ errorMessage }}</p>
       <form v-else-if="settings" class="card" @submit.prevent="save">
         <p v-if="me?.email" class="note">お知らせの送り先：<strong>{{ me.email }}</strong>（変更は <NuxtLink to="/mypage/email">メールアドレスの変更</NuxtLink> から）</p>
-        <p v-if="me?.nickname" class="notice">ニックネームで登録されているため、メールアドレスが登録されていません。メールでのお知らせは届きません。新しいお返事などは、ログイン後の画面でお知らせします。</p>
+        <p v-if="me?.nickname" class="notice">ニックネームで登録されているため、メールアドレスが登録されていません。メールでのお知らせは届きません。新しいお返事などは、ログイン後の画面でお知らせします。<br /><NuxtLink to="/mypage/notify-email">通知用のメールアドレスを登録する</NuxtLink>（任意）</p>
         <p class="note">
           メールには、ご相談の内容は書かれません。「新しいお知らせがあります」とだけお伝えし、内容はログイン後の画面でご確認いただきます。<br />
           ご家族や職場の方にメールを見られる心配があるときは、すべて止めることができます。
