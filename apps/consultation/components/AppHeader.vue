@@ -4,6 +4,12 @@
 // Q&A はログインしていなくても見られるため、未ログインのときは「はじめる」への導線だけを出す
 const me = useMe();
 const signedIn = ref(true);
+const leaving = ref(false);
+// composables/useMe.ts の signOut：ログイン情報を消し、ページごと読み込み直して画面の相談内容を残さない
+async function logout() {
+  leaving.value = true;
+  await signOut();
+}
 onMounted(async () => {
   const supabase = useSupabaseClient();
   const { data } = await supabase.auth.getSession();
@@ -27,6 +33,8 @@ onMounted(async () => {
       <NuxtLink v-if="me?.features.qa" to="/qa">Q&amp;A</NuxtLink>
       <NuxtLink v-if="me?.features.video" to="/videos">動画</NuxtLink>
       <NuxtLink to="/mypage">マイページ</NuxtLink>
+      <!-- どの画面からでもログアウトできるようにする（共用の端末で相談内容を残さないため。要件 10.4） -->
+      <button type="button" class="logout" :disabled="leaving" @click="logout">ログアウト</button>
     </nav>
     <nav v-else>
       <NuxtLink to="/qa">Q&amp;A</NuxtLink>
@@ -52,4 +60,7 @@ onMounted(async () => {
 nav { display: flex; gap: 16px; font-size: 14px; }
 nav a { color: var(--muted); text-decoration: none; padding: 6px 0; }
 nav a.router-link-active { color: var(--accent); font-weight: 600; }
+nav .logout { width: auto; margin: 0; padding: 6px 0; font: inherit; font-size: 14px; color: var(--muted); background: none; border: 0; cursor: pointer; text-decoration: underline; }
+nav .logout:hover { color: var(--fg); }
+nav .logout:disabled { opacity: 0.6; cursor: default; }
 </style>
