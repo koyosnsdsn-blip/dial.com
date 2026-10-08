@@ -341,6 +341,7 @@ onMounted(load);
         </section>
 
         <ClientAdminsPanel :client-id="detail.clientId" :closed="closed" />
+        <ClientIpAllowlistPanel :client-id="detail.clientId" :contract-type="detail.contractType" />
         <ClientReportsPanel :client-id="detail.clientId" :contract-type="detail.contractType" :prep="detail.status === 'prep'" />
 
         <section v-if="!closed" class="panel danger">

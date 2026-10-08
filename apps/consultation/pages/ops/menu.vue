@@ -18,6 +18,7 @@ const items = computed(() =>
     { to: "/ops/disclosures", title: "開示請求", note: "保有個人データの開示請求への対応", admin: true },
     { to: "/ops/reuse-consents", title: "二次利用同意", note: "相談内容を記事にするための同意の状況", admin: true },
     { to: "/ops/accounts", title: "利用者アカウントの照会", note: "ニックネーム・メールアドレスの完全一致", admin: true },
+    { to: "/ops/ip-rules", title: "接続元の拒否リスト", note: "危険と名指しされたIPアドレスからのアクセスを拒否する", admin: true },
     { to: "/ops/settings", title: "サービス全体設定", note: "自動終了までの日数などの基準値", admin: true },
   ].filter((i) => !i.admin || isAdmin.value),
 );

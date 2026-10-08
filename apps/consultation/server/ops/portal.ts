@@ -11,10 +11,11 @@ import { serviceDb } from "./db";
 import { areaClaims, areaSupabaseClient } from "./session";
 import { loginIdToEmail, roleOfLoginEmail } from "./nickname";
 import { createInviteLink, createResetLink } from "./setupLink";
+import { clientAdminIpAllowed } from "../utils/ipGuard";
 
 export type ClientAdminContext = { userId: string; clientId: string; name: string };
 
-// 検査すること：ログイン済み／多要素認証を通過（aal2）／client_admins に有効な本人の行がある
+// 検査すること：ログイン済み／多要素認証を通過（aal2）／client_admins に有効な本人の行がある／接続元がクライアントの許可リストに入っている（登録がある場合）
 // client_admins は本人の権限で読む（RLS：本人の行しか読めない）
 export async function requireClientAdmin(event: H3Event): Promise<ClientAdminContext> {
   let claims: Record<string, any> | null = null;
@@ -42,7 +43,16 @@ export async function requireClientAdmin(event: H3Event): Promise<ClientAdminCon
     .eq("admin_id", claims.sub)
     .maybeSingle();
   if (error || !data || data.status !== "active") throw createError({ statusCode: 403, statusMessage: "not_client_admin" });
-  return { userId: data.admin_id, clientId: data.client_id, name: data.name };
+  const ctx = { userId: data.admin_id, clientId: data.client_id, name: data.name };
+
+  // クライアント単位のIP許可リスト（要件 8.8.3。未決事項一覧 2.18）。登録があれば、登録した接続元からしか使えない
+  const { allowed, ip } = await clientAdminIpAllowed(event, data.client_id);
+  if (!allowed) {
+    // 拒否の記録は、不正なアクセスの検知に使う。接続元のIPは、確認のために理由欄に残す
+    await writePortalAudit(event, ctx, { action: "client_admin.ip_denied", targetType: "client_admins", targetId: data.admin_id, reason: `許可されていない接続元：${ip ?? "不明"}` }).catch(() => {});
+    throw createError({ statusCode: 403, statusMessage: "ip_not_allowed" });
+  }
+  return ctx;
 }
 
 export async function writePortalAudit(

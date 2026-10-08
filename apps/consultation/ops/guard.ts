@@ -25,7 +25,7 @@ import { roleOfLoginEmail } from "../utils/nickname";
 import { loadPortalAdmin, loadStaff, usePortalAdmin, useStaff } from "./useStaff";
 import { staffSessionExpired } from "./session";
 import { authClient } from "./authClient";
-const ADMIN_ONLY = ["/ops/staff", "/ops/audit", "/ops/clients", "/ops/accounts", "/ops/settings", "/ops/templates", "/ops/notices", "/ops/inquiries", "/ops/deletions", "/ops/genres", "/ops/videos", "/ops/disclosures", "/ops/mail-templates", "/ops/auto-texts", "/ops/reuse-consents"];
+const ADMIN_ONLY = ["/ops/staff", "/ops/audit", "/ops/clients", "/ops/accounts", "/ops/settings", "/ops/templates", "/ops/notices", "/ops/inquiries", "/ops/deletions", "/ops/genres", "/ops/videos", "/ops/disclosures", "/ops/mail-templates", "/ops/auto-texts", "/ops/reuse-consents", "/ops/ip-rules"];
 
 export async function opsGuard(to: RouteLocationNormalized) {
   if (to.path === "/ops/accept-invite") return;
