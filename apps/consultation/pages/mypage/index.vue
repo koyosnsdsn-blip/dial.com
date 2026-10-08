@@ -69,16 +69,19 @@ async function changeAttr(item: AttrItem, event: Event) {
 // 自身のデータの出力（要件 10.3.4）
 const exporting = ref(false);
 const exportError = ref("");
-async function exportData() {
+async function exportData(format: "csv" | "json") {
   exporting.value = true;
   exportError.value = "";
   try {
-    const data = await $fetch<Record<string, unknown>>("/api/export");
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const blob =
+      format === "csv"
+        ? // 受け取るときに先頭の BOM が取り除かれるので、Excel で文字化けしないよう付け直す。エラー時の判定のため、いったん文字列で受け取る
+          new Blob(["\uFEFF" + (await $fetch<string>("/api/export", { query: { format: "csv" }, responseType: "text" }))], { type: "text/csv;charset=utf-8" })
+        : new Blob([JSON.stringify(await $fetch<Record<string, unknown>>("/api/export"), null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `my-data-${dayKey(new Date().toISOString())}.json`;
+    a.download = `my-data-${dayKey(new Date().toISOString())}.${format}`;
     a.click();
     URL.revokeObjectURL(url);
   } catch (e: any) {
@@ -152,7 +155,9 @@ function currentOptionId(item: AttrItem): string {
           登録情報と、これまでのご相談（やり取りの全文・はじめにお答えいただいた内容）を、ファイルとして保存できます。<br />
           <strong>ファイルにはご相談の内容が含まれます。</strong>ご家族や職場の方と共用の端末・保存先には置かないよう、ご注意ください。
         </p>
-        <button type="button" class="secondary" :disabled="exporting" @click="exportData">{{ exporting ? "準備しています…" : "データをファイルに保存する" }}</button>
+        <button type="button" class="secondary" :disabled="exporting" @click="exportData('csv')">{{ exporting ? "準備しています…" : "表（CSV）で保存する：Excel などで開けます" }}</button>
+        <button type="button" class="secondary" :disabled="exporting" @click="exportData('json')">全項目をデータ形式（JSON）で保存する</button>
+        <p class="note">保存は、24時間に3回までです。</p>
         <p v-if="exportError" class="error" role="alert">{{ exportError }}</p>
       </section>
       <EmergencyLink />

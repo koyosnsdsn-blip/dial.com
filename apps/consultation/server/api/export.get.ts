@@ -4,7 +4,7 @@ import { isNicknameEmail } from "../../utils/nickname";
 // - 相談員の氏名・識別子は含めない（3.6.1）。往復の回数・案件の通番も含めない
 // - 出力の操作を監査ログに記録する（7.16）
 // - 短時間の反復出力は不正なアクセスの兆候になり得るため、回数に上限を設ける
-// 【仮】上限は24時間に3回。形式は JSON（形式・提供方法は実装フェーズで定める、とされている）
+// 【仮】上限は24時間に3回（JSON・CSV 合わせて）。形式は、表計算ソフトで開ける CSV（?format=csv。やり取り・アンケート・Q&Aを1つの表にまとめる）と、全項目の JSON。形式・提供方法は実装フェーズで定める、とされている
 // 未対応：相談サマリ（未実装）
 const MAX_EXPORTS_PER_DAY = 3;
 
@@ -67,9 +67,10 @@ export default defineEventHandler(async (event) => {
     manual: "相談員による対応完了",
     idle: "一定期間やり取りがなかったため",
     expiry: "有効期間の満了",
+    user: "ご自身で終了しました",
   };
   setHeader(event, "Cache-Control", "no-store");
-  return {
+  const data = {
     出力日時: new Date().toISOString(),
     登録情報: isNicknameEmail(own?.email ?? account.email, useRuntimeConfig(event).public.nicknameDomain as string)
       ? { ニックネーム: account.nickname, 登録日時: own?.created_at ?? null }
@@ -100,4 +101,27 @@ export default defineEventHandler(async (event) => {
         .map((m) => ({ 送信者: m.sender === "user" ? "あなた" : "相談員", 送信日時: m.sent_at, 本文: m.body })),
     })),
   };
+
+  if (getQuery(event).format !== "csv") return data;
+
+  // CSV：1行1件の時系列の表。Excel で文字化けしないよう、UTF-8（BOM付き）で返す
+  // 表計算ソフトが式として実行しないよう、= + - @ で始まる値の先頭に ' を付ける
+  const cell = (v: unknown) => {
+    let t = v === null || v === undefined ? "" : String(v);
+    if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+    return `"${t.replace(/"/g, '""')}"`;
+  };
+  const rows: unknown[][] = [["種類", "相談の開始日時", "日時", "項目", "内容"]];
+  for (const c of data.相談) {
+    for (const a of c.アンケートの回答) rows.push(["アンケート", c.開始日時, "", `${a.区分}：${a.設問}`, a.回答]);
+    for (const m of c.やり取り) rows.push(["やり取り", c.開始日時, m.送信日時, m.送信者, m.本文]);
+    rows.push(["相談の状態", c.開始日時, c.終了日時 ?? "", c.状態, c.終了の理由 ?? ""]);
+  }
+  for (const p of data["Q&Aの投稿"]) {
+    rows.push(["Q&A", "", p.投稿日時, `質問（${p.状態}）`, p.質問]);
+    if (p.回答) rows.push(["Q&A", "", p.投稿日時, "回答", p.回答]);
+  }
+  for (const a of data.属性の回答) rows.push(["属性の回答", "", a.回答日時, a.設問, a.回答]);
+  setHeader(event, "Content-Type", "text/csv; charset=utf-8");
+  return "\uFEFF" + rows.map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
 });
