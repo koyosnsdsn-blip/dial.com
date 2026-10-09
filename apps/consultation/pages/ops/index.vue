@@ -6,6 +6,7 @@
 // - SLAの期限・残り時間は起算方式が未決のため表示しない（未決事項 No.47）。経過が SLA 時間の半分・4分の3を超えたら色で強調する
 import { apiErrorMessage, formatCloseReason, formatElapsed, formatWaiting, shortId, waitingRatio } from "../../ops/format";
 import { useCaseRealtime } from "../../ops/useCaseRealtime";
+import { noteUrgent, playNotifySound } from "../../ops/notifySound";
 import { useStaff } from "../../ops/useStaff";
 type CaseRow = {
   caseId: string;
@@ -131,6 +132,10 @@ async function load() {
     const becameUrgent = next.filter((c) => c.urgent && before.has(c.caseId) && !before.get(c.caseId));
     for (const c of becameUrgent) newlyUrgent.value.add(c.caseId);
     if (becameUrgent.length > 0) alertUrgent();
+    // 通知音用に各案件の緊急状態を覚える。Realtime の合図で先に鳴っていれば、ここでは重ねて鳴らさない
+    let urgentSound = false;
+    for (const c of next) if (noteUrgent(c.caseId, c.urgent)) urgentSound = true;
+    if (urgentSound) playNotifySound("urgent");
     cases.value = next;
     errorMessage.value = "";
     loadSummary();

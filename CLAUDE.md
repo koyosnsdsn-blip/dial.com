@@ -29,7 +29,7 @@
   /consultation   ← アプリ本体（8.6.1のドメイン出し分けもこの中で行う）
     /pages              … 相談者側（一般向け・企業会員向け）
     /pages/ops          … 運営画面（相談員・運営管理者）。URLは /ops/…
-    /pages/ops/expert   … 先生（弁護士・社労士など）の画面。URLは /ops/expert/…（入口は /ops/expert-login。未決事項一覧 2.19）
+    /pages/ops/expert   … 先生（弁護士・社労士など）の画面。URLは /ops/expert/…（入口は /ops/login と共通。先生だけの入口 /ops/expert-login も残す。未決事項一覧 2.19）
     /pages/client-admin … クライアント管理サイト。URLは /client-admin/…
     /server/api         … 相談者側のサーバールート
     /server/api/ops     … 運営画面のサーバールート（/api/ops/…）

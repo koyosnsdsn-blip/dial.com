@@ -57,7 +57,7 @@ export async function opsGuard(to: RouteLocationNormalized) {
   // 運営画面では、相談員・運営管理者（staff）と先生（expert）のどちらでも「ログイン中」になりうる。それ以外の役割（相談者、クライアント管理者）は未ログインと同じ扱い
   const isExpert = !client && loginRole === "expert";
   const signedIn = Boolean(session) && (client ? loginRole === "client_admin" : loginRole === "staff" || loginRole === "expert");
-  // ログイン画面は、その画面の役割で入る場所（/ops/login は staff、/ops/expert-login は expert）。別の役割でログイン中なら、入り直せるようにフォームを見せる
+  // ログイン画面は、その画面の役割で入る場所（/ops/login は staff と expert、/ops/expert-login は expert だけ）。別の役割でログイン中なら、入り直せるようにフォームを見せる
   const loginPageRole = to.path === "/ops/expert-login" ? "expert" : to.path === "/ops/login" ? "staff" : null;
   const home = isExpert ? "/ops/expert" : area.home;
 
@@ -73,7 +73,9 @@ export async function opsGuard(to: RouteLocationNormalized) {
 
   if (client ? to.path === area.login : loginPageRole !== null) {
     // その画面の役割でログイン済みなら先へ進める。別の役割でログイン中のときは、フォームを見せる（入り直すと上書きされる）
-    return signedIn && (client || loginRole === loginPageRole) ? navigateTo(area.mfa) : undefined;
+    // /ops/login は先生も使える入口（OpsLoginForm）なので、先生でログイン済みでも先へ進める。/ops/expert-login は先生だけ
+    const sameRole = loginRole === loginPageRole || (loginPageRole === "staff" && loginRole === "expert");
+    return signedIn && (client || sameRole) ? navigateTo(area.mfa) : undefined;
   }
 
   if (!signedIn) {

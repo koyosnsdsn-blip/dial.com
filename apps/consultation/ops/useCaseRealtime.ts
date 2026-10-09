@@ -7,6 +7,7 @@
 // 配信範囲は RLS に従う：相談員は担当案件のみ、運営管理者は全案件。MFA未通過のセッションには配信されない。
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { authClient } from "./authClient";
+import { noteUrgent, playNotifySound } from "./notifySound";
 
 export type RealtimeStatus = "connecting" | "live" | "error";
 
@@ -26,9 +27,16 @@ export function useCaseRealtime(onChange: (kind: "case" | "message", caseId: str
     channel = supabase
       .channel("staff-cases")
       .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, (payload: any) => {
+        // 通知音（運営画面の「通知音」が ON のときだけ鳴る）。行データは音の種類を決めるためだけに使い、画面には出さない
+        if (payload.eventType === "INSERT") playNotifySound("case");
+        else if (payload.eventType === "UPDATE" && payload.new?.case_id && payload.new.status === "open") {
+          if (noteUrgent(payload.new.case_id, Boolean(payload.new.urgent_flag))) playNotifySound("urgent");
+        }
         onChange("case", (payload.new?.case_id ?? payload.old?.case_id ?? null) as string | null);
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
+        // 利用者からのメッセージだけ鳴らす（相談員自身の送信では鳴らさない）
+        if (payload.new?.sender === "user") playNotifySound("message");
         onChange("message", (payload.new?.case_id ?? null) as string | null);
       })
       .subscribe((s) => {
