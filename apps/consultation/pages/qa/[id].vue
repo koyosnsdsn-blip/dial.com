@@ -19,6 +19,9 @@ type Detail = {
     body: string;
     masked: boolean;
     publishedAt: string | null;
+    helpfulCount: number;
+    helpedByMe: boolean;
+    reportedByMe: boolean;
     expertName: string;
     expertQualification: string;
     expertAffiliation: string | null;
@@ -83,6 +86,40 @@ async function report() {
     reportBusy.value = false;
   }
 }
+// 先生コメントへの「参考になった」・通報
+const helpfulBusy = ref("");
+const helpfulError = ref("");
+async function toggleHelpful(c: Detail["expertComments"][number]) {
+  helpfulBusy.value = c.commentId;
+  helpfulError.value = "";
+  try {
+    const res = await $fetch<{ on: boolean; count: number }>(`/api/qa/${id.value}/comments/${c.commentId}/helpful`, { method: "PUT", body: { on: !c.helpedByMe } });
+    c.helpedByMe = res.on;
+    c.helpfulCount = res.count;
+  } catch (e: any) {
+    helpfulError.value = apiErrorMessage(e);
+  } finally {
+    helpfulBusy.value = "";
+  }
+}
+const commentReportFor = ref("");
+const commentReportCode = ref("");
+const commentReportBusy = ref(false);
+const commentReportMessage = ref("");
+async function reportComment(c: Detail["expertComments"][number]) {
+  commentReportBusy.value = true;
+  try {
+    await $fetch<unknown>(`/api/qa/${id.value}/comments/${c.commentId}/report`, { method: "POST", body: { code: commentReportCode.value } });
+    commentReportMessage.value = "通報を受け付けました。運営が内容を確認します。";
+    c.reportedByMe = true;
+    commentReportFor.value = "";
+    commentReportCode.value = "";
+  } catch (e: any) {
+    commentReportMessage.value = apiErrorMessage(e);
+  } finally {
+    commentReportBusy.value = false;
+  }
+}
 onMounted(load);
 </script>
 
@@ -136,7 +173,28 @@ onMounted(load);
             <p v-if="c.expertBio" class="note">{{ c.expertBio }}</p>
             <p class="text">{{ c.body }}<template v-if="c.masked">…</template></p>
             <p v-if="c.publishedAt" class="note">{{ formatShortDate(c.publishedAt) }}</p>
+            <div class="actions">
+              <template v-if="!c.masked">
+                <button v-if="detail.signedIn" type="button" class="secondary small" :class="{ on: c.helpedByMe }" :disabled="helpfulBusy === c.commentId" :aria-pressed="c.helpedByMe" @click="toggleHelpful(c)">
+                  {{ c.helpedByMe ? "参考になった（取り消す）" : "参考になった" }}
+                </button>
+                <span v-if="c.helpfulCount > 0" class="count">参考になった {{ c.helpfulCount }} 人</span>
+              </template>
+              <template v-if="detail.signedIn">
+                <span v-if="c.reportedByMe" class="note">通報を受け付けています</span>
+                <button v-else-if="commentReportFor !== c.commentId" type="button" class="plain" @click="commentReportFor = c.commentId">このコメントの問題を報告する</button>
+              </template>
+            </div>
+            <div v-if="commentReportFor === c.commentId" class="card stack">
+              <h3>このコメントの問題を報告する</h3>
+              <label v-for="r in REPORT_REASONS" :key="r.code" class="radio"><input v-model="commentReportCode" type="radio" name="comment-reason" :value="r.code" />{{ r.label }}</label>
+              <p class="note">報告の結果は、個別にはお知らせしていません。</p>
+              <button type="button" :disabled="commentReportBusy || commentReportCode === ''" @click="reportComment(c)">報告する</button>
+              <button type="button" class="secondary" :disabled="commentReportBusy" @click="commentReportFor = ''">やめる</button>
+            </div>
           </div>
+          <p v-if="helpfulError" class="error" role="alert">{{ helpfulError }}</p>
+          <p v-if="commentReportMessage" class="note" role="status">{{ commentReportMessage }}</p>
           <p v-if="detail.expertComments.some((c) => c.masked)" class="note">続きは、上の回答の全文を開くとお読みいただけます。</p>
         </section>
 
@@ -174,6 +232,10 @@ onMounted(load);
 .expert { padding: 10px 0; border-top: 1px solid var(--line); }
 .expert .who { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin-bottom: 4px; }
 .expert .who span { font-size: 0.85rem; color: var(--muted); }
+.expert .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 6px; }
+.expert .actions .count { font-size: 0.85rem; color: var(--muted); }
+.expert button.small { width: auto; padding: 4px 12px; font-size: 0.85rem; }
+.expert button.on { background: var(--accent-soft); color: var(--accent); }
 .report { margin: 8px 0 16px; text-align: center; }
 .report .card { text-align: left; }
 .radio { display: flex; align-items: center; gap: 8px; }

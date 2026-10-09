@@ -98,6 +98,7 @@ export function apiErrorMessage(e: any): string {
     quota_exceeded: "今月の投稿は上限（3問）に達しました。個別のご相談は「ご相談」からお受けしています。",
     read_quota_exceeded: "今月、全文を読める本数（3本）を使い切りました。",
     already_reported: "この記事は、すでに通報を受け付けています。",
+    full_read_required: "「参考になった」は、全文を読んだコメントにだけ付けられます。",
     report_limit: "通報の回数が上限に達しました。時間をおいて、もう一度お試しください。",
     invalid_resubmit: "この投稿は書き直せません。",
     resubmit_limit: "書き直しの回数が上限に達しました。",

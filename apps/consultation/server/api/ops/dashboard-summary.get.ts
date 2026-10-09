@@ -22,9 +22,12 @@ export default defineEventHandler(async (event) => {
   ]);
   // 機能1：回答待ちの投稿・未対応の通報（相談員も対応するため、全員に返す）
   const sdbAll = serviceDb(event);
-  const [qaPending, qaReports] = await Promise.all([
+  const [qaPending, qaReports, expertPending, expertReports] = await Promise.all([
     count(sdbAll.from("questions").select("question_id", { count: "exact", head: true }).eq("status", "pending").is("hidden_at", null)),
     count(sdbAll.from("reports").select("report_id", { count: "exact", head: true }).is("resolution", null)),
+    // 先生のコメント：確認待ち／未対応の通報（相談員が確認するため、全員に返す）
+    count(sdbAll.from("expert_comments").select("comment_id", { count: "exact", head: true }).eq("status", "pending")),
+    count(sdbAll.from("expert_comment_reports").select("report_id", { count: "exact", head: true }).is("resolution", null)),
   ]);
   let disclosuresOpen = 0;
   let reuseWaiting = 0;
@@ -43,5 +46,5 @@ export default defineEventHandler(async (event) => {
       count(sdb.from("deletion_requests").select("request_id", { count: "exact", head: true }).eq("execution_status", "pending")),
     ]);
   }
-  return { awaiting, urgent, unassigned, busy: awaiting >= settings.busy_threshold!, busyThreshold: settings.busy_threshold!, inquiries, deletionFailed, deletionPending, qaPending, qaReports, disclosuresOpen, reuseWaiting };
+  return { awaiting, urgent, unassigned, busy: awaiting >= settings.busy_threshold!, busyThreshold: settings.busy_threshold!, inquiries, deletionFailed, deletionPending, qaPending, qaReports, expertPending, expertReports, disclosuresOpen, reuseWaiting };
 });

@@ -12,6 +12,7 @@ type Item = {
   answerPreview: string;
   publishedAt: string | null;
   featured: boolean;
+  hasExpertComment: boolean;
 };
 type List = {
   genres: { genreId: string; name: string }[];
@@ -92,6 +93,7 @@ onMounted(load);
               <span class="meta">
                 <span v-if="it.featured" class="tag featured">注目</span>
                 <span v-if="it.genre" class="tag">{{ it.genre }}</span>
+                <span v-if="it.hasExpertComment" class="tag expert">先生のコメントあり</span>
                 <span class="date">{{ formatShortDate(it.publishedAt) }}</span>
               </span>
               <span class="q">Q. {{ it.question }}<template v-if="it.questionCut">…</template></span>
@@ -122,6 +124,7 @@ onMounted(load);
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 0.8rem; color: var(--muted); }
 .tag { padding: 1px 10px; background: #e9ece9; border-radius: 999px; }
 .tag.featured { background: var(--accent); color: #fff; }
+.tag.expert { background: var(--accent-soft); color: var(--accent); }
 .q { display: block; font-weight: 600; overflow-wrap: anywhere; }
 .a { display: block; margin-top: 6px; font-size: 0.9rem; color: var(--muted); overflow-wrap: anywhere; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 16px 0; }

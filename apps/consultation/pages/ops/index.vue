@@ -105,7 +105,7 @@ const sortedCases = computed(() => {
 });
 
 // 件数は、絞り込みに関係なく全体の状況を表示する（/api/dashboard-summary）
-type Summary = { awaiting: number; urgent: number; unassigned: number; busy: boolean; busyThreshold: number; inquiries: number; deletionFailed: number; deletionPending: number; qaPending: number; qaReports: number; disclosuresOpen: number; reuseWaiting: number };
+type Summary = { awaiting: number; urgent: number; unassigned: number; busy: boolean; busyThreshold: number; inquiries: number; deletionFailed: number; deletionPending: number; qaPending: number; qaReports: number; expertPending: number; expertReports: number; disclosuresOpen: number; reuseWaiting: number };
 const summary = ref<Summary | null>(null);
 const urgentCount = computed(() => summary.value?.urgent ?? cases.value.filter((c) => c.urgent && c.status === "open").length);
 const awaitingCount = computed(() => summary.value?.awaiting ?? 0);
@@ -219,6 +219,8 @@ watch(filters, load);
         <div v-if="staff?.role === 'admin'" class="tile"><span class="num">{{ unassignedCount }}</span><span class="label">未割当</span></div>
         <NuxtLink v-if="summary && summary.qaPending > 0" to="/ops/qa" class="tile link"><span class="num">{{ summary.qaPending }}</span><span class="label">Q&amp;A の回答待ち</span></NuxtLink>
         <NuxtLink v-if="summary && summary.qaReports > 0" to="/ops/qa-reports" class="tile link alert"><span class="num">{{ summary.qaReports }}</span><span class="label">未対応の通報</span></NuxtLink>
+        <NuxtLink v-if="summary && summary.expertPending > 0" to="/ops/expert-comments" class="tile link alert"><span class="num">{{ summary.expertPending }}</span><span class="label">確認待ちの先生コメント</span></NuxtLink>
+        <NuxtLink v-if="summary && summary.expertReports > 0" to="/ops/expert-comments?status=reported" class="tile link alert"><span class="num">{{ summary.expertReports }}</span><span class="label">先生コメントへの通報</span></NuxtLink>
         <NuxtLink v-if="staff?.role === 'admin' && summary && summary.disclosuresOpen > 0" to="/ops/disclosures" class="tile link"><span class="num">{{ summary.disclosuresOpen }}</span><span class="label">開示請求（未回答）</span></NuxtLink>
         <NuxtLink v-if="staff?.role === 'admin' && summary && summary.inquiries > 0" to="/ops/inquiries" class="tile link"><span class="num">{{ summary.inquiries }}</span><span class="label">未対応の問い合わせ</span></NuxtLink>
         <NuxtLink v-if="staff?.role === 'admin' && summary && summary.deletionFailed > 0" to="/ops/deletions" class="tile link alert"><span class="num">{{ summary.deletionFailed }}</span><span class="label">削除の失敗</span></NuxtLink>

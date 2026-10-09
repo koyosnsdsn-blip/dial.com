@@ -10,7 +10,7 @@ type Detail = {
   question: string;
   publishedAt: string | null;
   answer: string | null;
-  comment: { commentId: string; body: string; status: "draft" | "pending" | "returned" | "published" | "hidden"; reviewNote: string | null; submittedAt: string | null; publishedAt: string | null } | null;
+  comment: { commentId: string; body: string; status: "draft" | "pending" | "returned" | "published" | "hidden"; reviewNote: string | null; submittedAt: string | null; publishedAt: string | null; helpfulCount: number } | null;
 };
 const MAX = 5000;
 const route = useRoute();
@@ -105,7 +105,7 @@ onMounted(load);
           </template>
           <template v-else-if="detail.comment">
             <p class="text">{{ detail.comment.body }}</p>
-            <p v-if="detail.comment.publishedAt" class="note">{{ formatDateTime(detail.comment.publishedAt) }} に公開されました。</p>
+            <p v-if="detail.comment.publishedAt" class="note">{{ formatDateTime(detail.comment.publishedAt) }} に公開されました。<template v-if="detail.comment.helpfulCount > 0">「参考になった」 {{ detail.comment.helpfulCount }} 人</template></p>
           </template>
         </section>
       </template>

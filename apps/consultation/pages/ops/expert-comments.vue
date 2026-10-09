@@ -9,6 +9,7 @@ type Item = {
   status: string;
   reviewNote: string | null;
   submittedAt: string | null;
+  reports: { count: number; reasons: Record<string, number> } | null;
   publishedAt: string | null;
   questionId: string;
   displayId: string | null;
@@ -21,17 +22,20 @@ type Item = {
 const TABS = [
   { key: "pending", label: "確認待ち" },
   { key: "returned", label: "差し戻し中" },
+  { key: "reported", label: "通報あり" },
   { key: "published", label: "公開中" },
   { key: "hidden", label: "非表示" },
 ] as const;
-const tab = ref<(typeof TABS)[number]["key"]>("pending");
+const route = useRoute();
+const initial = TABS.find((t) => t.key === route.query.status)?.key;
+const tab = ref<(typeof TABS)[number]["key"]>(initial ?? "pending");
 const items = ref<Item[]>([]);
 const loading = ref(true);
 const errorMessage = ref("");
 const message = ref("");
 const busy = ref(false);
 const active = ref<string | null>(null);   // 操作中のコメント
-const mode = ref<"return" | "hide" | "restore" | null>(null);
+const mode = ref<"return" | "hide" | "restore" | "dismiss" | "close_reports" | null>(null);
 const confirmed = reactive<Record<string, boolean>>({});
 const text = ref("");
 
@@ -53,7 +57,7 @@ function choose(key: typeof tab.value) {
   message.value = "";
   load();
 }
-function openMode(id: string, m: "return" | "hide" | "restore") {
+function openMode(id: string, m: "return" | "hide" | "restore" | "dismiss" | "close_reports") {
   active.value = id;
   mode.value = m;
   text.value = "";
@@ -78,8 +82,11 @@ const publish = (id: string) => run(id, { action: "publish", confirmed: confirme
 const sendMode = (id: string) => {
   if (mode.value === "return") return run(id, { action: "return", note: text.value }, "差し戻しました。");
   if (mode.value === "hide") return run(id, { action: "hide", reason: text.value }, "非表示にしました。");
+  if (mode.value === "dismiss") return run(id, { action: "dismiss", reason: text.value }, "通報を却下しました（コメントは公開のままです）。");
+  if (mode.value === "close_reports") return run(id, { action: "close_reports", reason: text.value }, "通報を対応済みにしました（コメントは非表示のままです）。");
   return run(id, { action: "restore", reason: text.value }, "再び公開しました。");
 };
+const MODE_LABEL = { return: "差し戻す", hide: "非表示にする", restore: "再び公開する", dismiss: "通報を却下する", close_reports: "対応済みにする" } as const;
 onMounted(load);
 </script>
 
@@ -111,6 +118,9 @@ onMounted(load);
         <h2 class="label">{{ c.expertName }} 先生（{{ c.expertQualification }}<template v-if="c.expertAffiliation">／{{ c.expertAffiliation }}</template>）のコメント</h2>
         <p class="text">{{ c.body }}</p>
         <p v-if="c.reviewNote" class="note">差し戻しの理由：{{ c.reviewNote }}</p>
+        <p v-if="c.reports" class="alert">
+          未対応の通報 {{ c.reports.count }} 件（{{ Object.entries(c.reports.reasons).map(([k, v]) => `${k} ${v}`).join("、") }}）<span v-if="c.status === 'hidden'">／通報の集中により自動で非表示になっている場合があります</span>
+        </p>
 
         <div v-if="tab === 'pending'" class="actions">
           <template v-if="active === c.commentId && mode === 'return'">
@@ -129,16 +139,24 @@ onMounted(load);
           </template>
         </div>
 
-        <div v-else-if="tab === 'published' || tab === 'hidden'" class="actions">
+        <div v-else-if="c.status === 'published' || c.status === 'hidden'" class="actions">
           <template v-if="active === c.commentId">
             <label>理由（必須。500文字以内）<input v-model="text" maxlength="500" /></label>
             <div class="row">
               <button class="secondary" type="button" @click="active = null">やめる</button>
-              <button type="button" :disabled="busy || text.trim() === ''" @click="sendMode(c.commentId)">{{ mode === 'hide' ? "非表示にする" : "再び公開する" }}</button>
+              <button type="button" :disabled="busy || text.trim() === ''" @click="sendMode(c.commentId)">{{ MODE_LABEL[mode ?? "restore"] }}</button>
             </div>
           </template>
-          <button v-else-if="tab === 'published'" class="secondary" type="button" @click="openMode(c.commentId, 'hide')">非表示にする</button>
-          <button v-else class="secondary" type="button" @click="openMode(c.commentId, 'restore')">再び公開する</button>
+          <div v-else class="row">
+            <template v-if="c.status === 'published'">
+              <button class="secondary" type="button" @click="openMode(c.commentId, 'hide')">非表示にする</button>
+              <button v-if="c.reports" class="secondary" type="button" @click="openMode(c.commentId, 'dismiss')">通報を却下する（公開のまま）</button>
+            </template>
+            <template v-else>
+              <button class="secondary" type="button" @click="openMode(c.commentId, 'restore')">再び公開する</button>
+              <button v-if="c.reports" class="secondary" type="button" @click="openMode(c.commentId, 'close_reports')">非表示のまま、通報を対応済みにする</button>
+            </template>
+          </div>
         </div>
       </article>
     </main>
@@ -150,6 +168,7 @@ onMounted(load);
 .tabs { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
 .tabs button { width: auto; padding: 6px 14px; font-size: 13px; background: #fff; color: var(--fg); border: 1px solid var(--line); }
 .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.alert { padding: 8px 12px; background: #fff8c5; color: #7d4e00; border-radius: 6px; font-size: 14px; }
 .ok { padding: 10px 14px; background: #dafbe1; color: #1a7f37; border-radius: 6px; }
 .card { margin: 12px 0; padding: 16px 20px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
 .meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); }

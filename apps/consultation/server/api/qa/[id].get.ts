@@ -52,6 +52,22 @@ export default defineEventHandler(async (event) => {
     .eq("status", "published")
     .order("published_at");
   if (commentError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+  // 「参考になった」の件数と、自分が付けたか／通報したか（件数だけを公開する）
+  const commentIds = ((commentRows ?? []) as any[]).map((c) => c.comment_id as string);
+  const helpfulCount = new Map<string, number>();
+  const helpedByMe = new Set<string>();
+  const reportedByMe = new Set<string>();
+  if (commentIds.length > 0) {
+    const [helpful, mineHelpful, mineReports] = await Promise.all([
+      db.from("expert_comment_helpful").select("comment_id").in("comment_id", commentIds).limit(20000),
+      account ? db.from("expert_comment_helpful").select("comment_id").in("comment_id", commentIds).eq("account_id", account.userId) : Promise.resolve({ data: [] as any[], error: null }),
+      account ? db.from("expert_comment_reports").select("comment_id").in("comment_id", commentIds).eq("reporter_account_id", account.userId).is("resolution", null) : Promise.resolve({ data: [] as any[], error: null }),
+    ]);
+    if (helpful.error || mineHelpful.error || mineReports.error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+    for (const h of helpful.data ?? []) helpfulCount.set(h.comment_id, (helpfulCount.get(h.comment_id) ?? 0) + 1);
+    for (const h of mineHelpful.data ?? []) helpedByMe.add(h.comment_id);
+    for (const r of mineReports.data ?? []) reportedByMe.add(r.comment_id);
+  }
   const expertComments = ((commentRows ?? []) as any[]).map((c) => {
     const text = c.body as string;
     return {
@@ -59,6 +75,9 @@ export default defineEventHandler(async (event) => {
       body: full ? text : preview(text, ANSWER_PREVIEW),
       masked: !full && Array.from(text).length > ANSWER_PREVIEW,
       publishedAt: (c.published_at as string | null) ?? null,
+      helpfulCount: helpfulCount.get(c.comment_id) ?? 0,
+      helpedByMe: helpedByMe.has(c.comment_id),
+      reportedByMe: reportedByMe.has(c.comment_id),
       expertName: (c.expert?.display_name as string) ?? "",
       expertQualification: (c.expert?.qualification as string) ?? "",
       expertAffiliation: (c.expert?.affiliation as string | null) ?? null,

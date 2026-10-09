@@ -41,6 +41,15 @@ export default defineEventHandler(async (event) => {
   const { data, error, count } = await request;
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
 
+  // 公開中の先生コメントがある記事（一覧に「先生のコメントあり」を出す）
+  const pageIds = ((data ?? []) as any[]).map((r) => r.question_id as string);
+  const withExpert = new Set<string>();
+  if (pageIds.length > 0) {
+    const { data: ec, error: ecError } = await db.from("expert_comments").select("question_id").in("question_id", pageIds).eq("status", "published");
+    if (ecError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+    for (const c of ec ?? []) withExpert.add(c.question_id);
+  }
+
   const names = new Map((genres ?? []).map((g: any) => [g.genre_id as string, g.name as string]));
   return {
     genres: genreList(genres),
@@ -58,6 +67,7 @@ export default defineEventHandler(async (event) => {
       answerPreview: preview(r.answers?.[0]?.body ?? "", ANSWER_PREVIEW),
       publishedAt: r.published_at as string | null,
       featured: Boolean(r.featured),
+      hasExpertComment: withExpert.has(r.question_id),
     })),
   };
 });

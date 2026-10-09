@@ -20,6 +20,14 @@ export default defineEventHandler(async (event) => {
   ]);
   if (commentError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
 
+  // 自分のコメントの「参考になった」の件数（誰が付けたかは返さない）
+  let helpfulCount = 0;
+  if (comment?.status === "published") {
+    const { count, error: helpfulError } = await svc.from("expert_comment_helpful").select("account_id", { count: "exact", head: true }).eq("comment_id", comment.comment_id);
+    if (helpfulError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+    helpfulCount = count ?? 0;
+  }
+
   return {
     questionId: q.question_id as string,
     displayId: (q.display_id as string | null) ?? null,
@@ -35,6 +43,7 @@ export default defineEventHandler(async (event) => {
           reviewNote: (comment.review_note as string | null) ?? null,
           submittedAt: (comment.submitted_at as string | null) ?? null,
           publishedAt: (comment.published_at as string | null) ?? null,
+          helpfulCount,
         }
       : null,
   };

@@ -23,6 +23,13 @@ export function cleanKeyword(value: unknown): string {
   return value.replace(/[%_,()\\*"']/g, " ").replace(/\s+/g, " ").trim().slice(0, 50);
 }
 
+// 先生コメントが「その質問のコメント」であり、公開中であること。違えば 404（存在も教えない）
+export async function requirePublishedExpertComment(db: SupabaseClient, questionId: string, commentId: string): Promise<void> {
+  const { data, error } = await db.from("expert_comments").select("comment_id").eq("comment_id", commentId).eq("question_id", questionId).eq("status", "published").maybeSingle();
+  if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+  if (!data) throw createError({ statusCode: 404, statusMessage: "qa_not_found" });
+}
+
 export const REPORT_CODES = ["identifiable", "inappropriate", "incorrect", "other"] as const;
 
 export function qaRpcError(error: { message?: string; code?: string } | null): never {
