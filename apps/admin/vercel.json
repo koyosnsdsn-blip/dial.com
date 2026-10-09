@@ -1,4 +1,0 @@
-{
-  "regions": ["hnd1"],
-  "crons": [{ "path": "/api/cron/purge-files", "schedule": "40 18 * * *" }]
-}
