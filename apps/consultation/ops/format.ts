@@ -146,6 +146,17 @@ export function apiErrorMessage(e: any): string {
     last_client_admin: "有効なクライアント管理者が1人もいなくなるため、変更できません。",
     report_not_available: "準備中のクライアントには、レポートを作成できません。",
     not_client_admin: "このアカウントでは、クライアント管理サイトを利用できません。",
+    display_name_required: "表示名を入力してください（50文字以内）。",
+    qualification_required: "資格・肩書を入力してください（50文字以内）。",
+    genres_required: "担当ジャンルを1つ以上選んでください。",
+    invalid_affiliation: "所属は100文字以内で入力してください。",
+    invalid_bio: "紹介文は1000文字以内で入力してください。",
+    comment_locked: "このコメントは、すでに提出・公開されているため、変更できません。",
+    question_not_open: "この質問には、現在コメントできません（非公開になったか、担当ジャンルが変更された可能性があります）。",
+    comment_not_pending: "このコメントは、すでに確認済みです。",
+    review_note_required: "差し戻しの理由を入力してください（1000文字以内）。",
+    invalid_action: "操作が正しくありません。",
+    not_expert: "このアカウントでは、先生用の画面を利用できません。",
     survey_retired: "この設問はすでに取り下げられています。",
   };
   if (message && map[message]) return map[message];

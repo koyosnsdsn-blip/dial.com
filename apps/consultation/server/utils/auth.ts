@@ -30,10 +30,10 @@ export async function requireAccount(event: H3Event): Promise<AccountContext> {
   }
   const userId = claims.sub as string;
 
-  // ログインIDの接頭辞が相談員（s-）・クライアント管理者（c-）のアカウントは、相談者側を利用できない
+  // ログインIDの接頭辞が相談員（s-）・クライアント管理者（c-）・先生（x-）のアカウントは、相談者側を利用できない
   // （役割ごとにアカウントを分けているため。相談者側に accounts の行が作られることも防ぐ）
   const loginRole = roleOfLoginEmail(claims.email, useRuntimeConfig(event).public.nicknameDomain as string);
-  if (loginRole === "staff" || loginRole === "client_admin") {
+  if (loginRole === "staff" || loginRole === "client_admin" || loginRole === "expert") {
     throw createError({ statusCode: 403, statusMessage: "staff_account" });
   }
 

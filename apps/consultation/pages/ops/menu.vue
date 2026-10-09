@@ -8,6 +8,8 @@ const items = computed(() =>
     { to: "/ops/exports", title: "データ出力（CSV）", note: "案件明細・日次サマリ・アンケート", admin: false },
     { to: "/ops/contacts", title: "公的窓口の一覧", note: "緊急時の案内ページに表示する窓口", admin: false },
     { to: "/ops/qa", title: "Q&A", note: "回答待ちの投稿、公開済みの記事、通報、ジャンル", admin: false },
+    { to: "/ops/expert-comments", title: "先生のコメントの確認", note: "先生が書いたコメントを確認し、公開・差し戻しする", admin: false },
+    { to: "/ops/experts", title: "先生の管理", note: "先生の登録・担当ジャンル・停止", admin: true },
     { to: "/ops/videos", title: "動画", note: "動画の登録と配信範囲の設定", admin: true },
     { to: "/ops/templates", title: "返信テンプレート", note: "返信に挿入できる定型文", admin: true },
     { to: "/ops/auto-texts", title: "自動文面", note: "相談の画面に表示される案内の文面", admin: true },

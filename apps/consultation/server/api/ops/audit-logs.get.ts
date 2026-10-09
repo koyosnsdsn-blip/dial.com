@@ -37,6 +37,9 @@ export default defineEventHandler(async (event) => {
   if (actorIds.length) {
     const { data: people } = await serviceDb(event).from("counselors").select("counselor_id, name").in("counselor_id", actorIds);
     for (const p of people ?? []) names.set(p.counselor_id, p.name);
+    // 先生（experts）の操作は、表示名に「先生」を付けて区別する
+    const { data: experts } = await serviceDb(event).from("experts").select("expert_id, display_name").in("expert_id", actorIds);
+    for (const e of experts ?? []) names.set(e.expert_id, `${e.display_name} 先生`);
   }
 
   await writeAudit(event, staff, { action: "audit.view", targetType: "audit_logs" });

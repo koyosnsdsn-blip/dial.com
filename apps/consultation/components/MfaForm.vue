@@ -74,6 +74,7 @@ async function submit() {
     return;
   }
   code.value = "";
+  // 運営画面は /ops へ進む（先生の場合は、ガードが /ops/expert へ振り分ける）
   await navigateTo(isOps ? "/ops" : "/client-admin");
 }
 </script>

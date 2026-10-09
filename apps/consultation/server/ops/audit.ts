@@ -7,6 +7,7 @@
 //   - audit_logs は追記専用（UPDATE・DELETE はDBのトリガで拒否される）
 import type { H3Event } from "h3";
 import type { StaffContext } from "./auth";
+import type { ExpertContext } from "./expert";
 import { serviceDb } from "./db";
 
 export type AuditEntry = {
@@ -17,9 +18,18 @@ export type AuditEntry = {
 };
 
 export async function writeAudit(event: H3Event, actor: StaffContext, entry: AuditEntry): Promise<void> {
+  await insertAudit(event, "counselor", actor.userId, entry);
+}
+
+// 先生（experts）の操作の記録。操作者の種別は expert（未決事項 2.19）
+export async function writeExpertAudit(event: H3Event, actor: ExpertContext, entry: AuditEntry): Promise<void> {
+  await insertAudit(event, "expert", actor.userId, entry);
+}
+
+async function insertAudit(event: H3Event, actorType: "counselor" | "expert", actorId: string, entry: AuditEntry): Promise<void> {
   const { error } = await serviceDb(event).from("audit_logs").insert({
-    actor_type: "counselor",
-    actor_id: actor.userId,
+    actor_type: actorType,
+    actor_id: actorId,
     action: entry.action,
     target_type: entry.targetType,
     target_id: entry.targetId ?? null,

@@ -21,6 +21,9 @@ export default defineEventHandler(async (event) => {
     const { error: moveError } = await db.from("questions").update({ genre_id: target }).eq("genre_id", id);
     if (moveError) throw createError({ statusCode: 500, statusMessage: "update_failed" });
   }
+  // 先生の担当ジャンルからも外す（外さないと、外部キーの制約でジャンルを消せない。未決事項 2.19）
+  const { error: expertError } = await db.from("expert_genres").delete().eq("genre_id", id);
+  if (expertError) throw createError({ statusCode: 500, statusMessage: "update_failed" });
   const { error } = await db.from("genres").delete().eq("genre_id", id);
   if (error) throw createError({ statusCode: 500, statusMessage: "update_failed" });
   return { ok: true, moved: count ?? 0 };

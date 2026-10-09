@@ -31,11 +31,15 @@ export async function loadStaff(): Promise<Staff | "mfa" | "forbidden" | "signed
 // ログアウトするのは、いま開いている領域のCookieだけ（相談者側や、もう一方の運営側のログインは残る。アカウント自体が別なので、巻き込まない）。
 // @click に直接渡されるため引数は取らない（クリックのイベントが入ってくる）
 export async function signOut() {
-  const client = useRoute().path.startsWith("/client-admin");
-  const loginPath = client ? "/client-admin/login" : "/ops/login";
+  const path = useRoute().path;
+  const client = path.startsWith("/client-admin");
+  // 先生の画面（/ops/expert…）からなら、先生のログイン画面へ戻る
+  const expert = path === "/ops/expert" || path.startsWith("/ops/expert/") || path === "/ops/expert-login";
+  const loginPath = client ? "/client-admin/login" : expert ? "/ops/expert-login" : "/ops/login";
   await authClient(client ? "client" : "ops").auth.signOut();
   useStaff().value = null;
   usePortalAdmin().value = null;
+  useExpert().value = null;
   await navigateTo(loginPath);
 }
 
@@ -60,4 +64,30 @@ export async function loadPortalAdmin(): Promise<PortalAdmin | null> {
     state.value = null;
   }
   return state.value;
+}
+
+// 先生（弁護士・社労士・メンタル相談の先生など。運営画面 /ops の中の /ops/expert から使う。未決事項 2.19）
+export type Expert = {
+  userId: string;
+  name: string;
+  qualification: string;
+  affiliation: string | null;
+};
+
+export const useExpert = () => useState<Expert | null>("expert", () => null);
+
+// 戻り値：Expert＝利用可、"mfa"＝MFA未通過、"forbidden"＝先生として登録されていない／停止、"signed_out"＝未ログイン
+export async function loadExpert(): Promise<Expert | "mfa" | "forbidden" | "signed_out"> {
+  const expert = useExpert();
+  try {
+    expert.value = await $fetch<Expert>("/api/ops/expert/me");
+    return expert.value;
+  } catch (e: any) {
+    expert.value = null;
+    const status = e?.statusCode ?? e?.response?.status;
+    const message = e?.statusMessage ?? e?.data?.statusMessage;
+    if (status === 401 && message === "mfa_required") return "mfa";
+    if (status === 403) return "forbidden";
+    return "signed_out";
+  }
 }

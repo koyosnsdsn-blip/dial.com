@@ -8,7 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { roleOfLoginEmail } from "../../utils/nickname";
 import { authClient } from "../../ops/authClient";
 // 相談員・運営管理者は運営画面用、クライアント管理者はクライアント管理サイト用の認証Cookieを使う（utils/authArea.ts）。
-// どちらの招待かは、リンクのトークンに入っているログインID（メールアドレス）の接頭辞で決める。
+// どちらの招待かは、リンクのトークンに入っているログインID（メールアドレス）の接頭辞で決める（先生 x-… も運営画面側）。
 // トークンを読む前（または、リンクを開き直したあと）は、運営画面側を仮に持っておき、セッションがある側に切り替える。
 let supabase: SupabaseClient = authClient("ops");
 const nicknameDomain = useRuntimeConfig().public.nicknameDomain as string;

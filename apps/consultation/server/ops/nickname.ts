@@ -1,6 +1,6 @@
 // 相談者側のニックネーム登録・役割ごとのログインID（utils/nickname.ts）と同じ計算。
 // 入力から、Supabase Auth に登録されている内部用の識別子（メールアドレスの形）を求める。
-//   u-… 相談者（ニックネーム）／ s-… 相談員・運営管理者（メールアドレス）／ c-… クライアント管理者（メールアドレス）
+//   u-… 相談者（ニックネーム）／ s-… 相談員・運営管理者（メールアドレス）／ c-… クライアント管理者（メールアドレス）／ x-… 先生（メールアドレス）
 // 【注意】相談者側の計算方法（正規化・ハッシュ・ドメイン・接頭辞）を変える場合は、こちらも必ず合わせること。
 import { createHash } from "node:crypto";
 import { LOGIN_PREFIX, type LoginRole, isNicknameEmail, normalizeNickname, roleOfLoginEmail } from "../../utils/nickname";

@@ -14,6 +14,16 @@ type Detail = {
   answer: string;
   answerMasked: boolean;
   answerUpdatedAt: string | null;
+  expertComments: {
+    commentId: string;
+    body: string;
+    masked: boolean;
+    publishedAt: string | null;
+    expertName: string;
+    expertQualification: string;
+    expertAffiliation: string | null;
+    expertBio: string | null;
+  }[];
   signedIn: boolean;
   remainingReads: number | null;
   reported: boolean;
@@ -115,6 +125,21 @@ onMounted(load);
           <p v-if="detail.answerUpdatedAt" class="note">回答は {{ formatShortDate(detail.answerUpdatedAt) }} に追記・修正されました。</p>
         </article>
 
+        <section v-if="detail.expertComments.length > 0" class="card stack">
+          <h2>先生からのコメント</h2>
+          <p class="note">専門家の先生が、一般的な考え方としてお寄せくださったコメントです。個別のご事情への判断ではありません。</p>
+          <div v-for="c in detail.expertComments" :key="c.commentId" class="expert">
+            <p class="who">
+              <strong>{{ c.expertName }} 先生</strong>
+              <span>{{ c.expertQualification }}<template v-if="c.expertAffiliation">／{{ c.expertAffiliation }}</template></span>
+            </p>
+            <p v-if="c.expertBio" class="note">{{ c.expertBio }}</p>
+            <p class="text">{{ c.body }}<template v-if="c.masked">…</template></p>
+            <p v-if="c.publishedAt" class="note">{{ formatShortDate(c.publishedAt) }}</p>
+          </div>
+          <p v-if="detail.expertComments.some((c) => c.masked)" class="note">続きは、上の回答の全文を開くとお読みいただけます。</p>
+        </section>
+
         <section class="card stack">
           <h2>ご自身の場合について相談したいとき</h2>
           <p class="note">ここでの回答は、一般的な考え方をお伝えするものです。個別のご事情によって、対応は変わります。</p>
@@ -146,6 +171,9 @@ onMounted(load);
 .text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .gate { margin-top: 12px; }
 .gate p { margin-bottom: 8px; }
+.expert { padding: 10px 0; border-top: 1px solid var(--line); }
+.expert .who { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+.expert .who span { font-size: 0.85rem; color: var(--muted); }
 .report { margin: 8px 0 16px; text-align: center; }
 .report .card { text-align: left; }
 .radio { display: flex; align-items: center; gap: 8px; }

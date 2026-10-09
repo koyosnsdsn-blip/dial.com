@@ -42,6 +42,30 @@ export default defineEventHandler(async (event) => {
 
   const { data: genre } = row.genre_id ? await db.from("genres").select("name").eq("genre_id", row.genre_id).maybeSingle() : { data: null };
   const answer = (row.answers?.[0]?.body as string | undefined) ?? "";
+
+  // 先生のコメント（公開中のもの。未決事項 2.19）。回答と同じ規則で、全文を読めない利用者には冒頭30文字だけを返す（切り詰めはサーバー側）。
+  // 先生の内部ID（expert_id）は返さない
+  const { data: commentRows, error: commentError } = await db
+    .from("expert_comments")
+    .select("comment_id, body, published_at, expert:experts(display_name, qualification, affiliation, bio)")
+    .eq("question_id", id)
+    .eq("status", "published")
+    .order("published_at");
+  if (commentError) throw createError({ statusCode: 500, statusMessage: "query_failed" });
+  const expertComments = ((commentRows ?? []) as any[]).map((c) => {
+    const text = c.body as string;
+    return {
+      commentId: c.comment_id as string,
+      body: full ? text : preview(text, ANSWER_PREVIEW),
+      masked: !full && Array.from(text).length > ANSWER_PREVIEW,
+      publishedAt: (c.published_at as string | null) ?? null,
+      expertName: (c.expert?.display_name as string) ?? "",
+      expertQualification: (c.expert?.qualification as string) ?? "",
+      expertAffiliation: (c.expert?.affiliation as string | null) ?? null,
+      expertBio: (c.expert?.bio as string | null) ?? null,
+    };
+  });
+
   return {
     questionId: row.question_id as string,
     displayId: (row.display_id as string | null) ?? null,
@@ -52,6 +76,7 @@ export default defineEventHandler(async (event) => {
     answer: full ? answer : preview(answer, ANSWER_PREVIEW),
     answerMasked: !full && Array.from(answer).length > ANSWER_PREVIEW,
     answerUpdatedAt: (row.answers?.[0]?.updated_at as string | null) ?? null,
+    expertComments,
     signedIn: Boolean(account),
     remainingReads,
     reported,
