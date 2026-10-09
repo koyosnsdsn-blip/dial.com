@@ -7,6 +7,7 @@
 import { loginIdToEmail } from "../utils/nickname";
 import { authClient } from "../ops/authClient";
 import { useExpert, usePortalAdmin, useStaff } from "../ops/useStaff";
+import { resetNotifySound } from "../ops/notifySound";
 
 // role="staff"（/ops/login）は、相談員・運営管理者に加えて先生も受け付ける（staff の識別子で失敗したら expert の識別子でも試す）。
 // role="expert"（/ops/expert-login）は先生だけ。同じメールアドレスで相談員と先生の両方に登録している人が、先生として入るための入口として残す
@@ -52,6 +53,7 @@ async function submit() {
   useStaff().value = null;
   usePortalAdmin().value = null;
   useExpert().value = null;
+  resetNotifySound();
   await navigateTo(props.role === "client_admin" ? "/client-admin/mfa" : "/ops/mfa");
 }
 </script>

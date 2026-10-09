@@ -1,4 +1,5 @@
 import { authClient } from "./authClient";
+import { resetNotifySound } from "./notifySound";
 
 // ログイン中の相談員・運営管理者の情報（/api/me の結果）を画面間で共有する。
 // 判定の正本はサーバー側（server/utils/auth.ts）。ここは表示と画面遷移の判断に使うだけ。
@@ -31,6 +32,7 @@ export async function loadStaff(): Promise<Staff | "mfa" | "forbidden" | "signed
 // ログアウトするのは、いま開いている領域のCookieだけ（相談者側や、もう一方の運営側のログインは残る。アカウント自体が別なので、巻き込まない）。
 // @click に直接渡されるため引数は取らない（クリックのイベントが入ってくる）
 export async function signOut() {
+  resetNotifySound();
   const path = useRoute().path;
   const client = path.startsWith("/client-admin");
   // 先生の画面（/ops/expert…）からなら、先生のログイン画面へ戻る
