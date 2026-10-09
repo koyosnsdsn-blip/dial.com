@@ -65,8 +65,9 @@ function format(ip: ParsedIp): string {
 
 // 「203.0.113.5」のようにアドレスだけなら /32（IPv6 は /128）として扱う。
 // ホスト部が0でない値（192.168.1.1/24）は、ネットワークのアドレス（192.168.1.0/24）に直さずに誤りとする（意図の取り違えを防ぐ）
+// 注意喚起の文書にある「無害化」した書き方（203[.]0[.]113[.]5、203(.)0(.)113(.)5、203[dot]0[dot]113[dot]5）も受け付ける
 export function parseCidr(input: string): ParsedCidr | null {
-  const [addr, len, extra] = input.trim().split("/");
+  const [addr, len, extra] = input.trim().replace(/\[\.\]|\(\.\)|\[dot\]/gi, ".").split("/");
   if (extra !== undefined || !addr) return null;
   const ip = parseIp(addr);
   if (!ip) return null;
@@ -88,4 +89,13 @@ export function cidrContains(cidr: ParsedCidr, ip: ParsedIp): boolean {
   if (rem === 0) return true;
   const mask = (0xff << (8 - rem)) & 0xff;
   return (cidr.bytes[full] & mask) === (ip.bytes[full] & mask);
+}
+
+// 貼り付けた複数の値を1件ずつに分ける。区切りは、改行・カンマ・セミコロン・空白（全角を含む）・読点。同じ値は1件にまとめる
+export function splitIpList(text: string): string[] {
+  const out: string[] = [];
+  for (const t of text.split(/[\s,;、，；]+/)) {
+    if (t !== "" && !out.includes(t)) out.push(t);
+  }
+  return out;
 }

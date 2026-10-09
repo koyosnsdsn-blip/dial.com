@@ -140,6 +140,7 @@ export function apiErrorMessage(e: any): string {
     self_block: "いまお使いの接続元が含まれるため、拒否リストに登録できません（ご自身が締め出されます）。",
     range_too_wide: "範囲が広すぎるため登録できません（IPv4 は /8、IPv6 は /16 より狭い範囲にしてください）。",
     already_registered: "この値は、すでに登録されています。",
+    too_many_items: "一度に登録できるのは50件までです。分けて登録してください。",
     too_many_rules: "登録できる件数の上限に達しています。",
     ip_not_allowed: "許可されていない接続元からのアクセスです。",
     last_client_admin: "有効なクライアント管理者が1人もいなくなるため、変更できません。",

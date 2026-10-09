@@ -3,6 +3,7 @@
 // 登録した接続元からは、相談者側・運営画面・クライアント管理サイトのすべての画面とAPIを使えなくなる。
 // 危険と名指しされたIPアドレス（JPCERT・警察などの公表）を登録する用途。許可リスト（その接続元からしか使えない）ではない（要件 8.6.4）。
 import { apiErrorMessage, formatDateTime } from "../../ops/format";
+import { cidrContains, parseCidr, parseIp, splitIpList } from "../../utils/ipCidr";
 type Rule = { ruleId: string; cidr: string; note: string | null; createdAt: string; createdBy: string | null };
 const rules = ref<Rule[]>([]);
 const myIp = ref<string | null>(null);
@@ -10,7 +11,7 @@ const loading = ref(true);
 const busy = ref(false);
 const message = ref("");
 const errorMessage = ref("");
-const form = reactive({ cidr: "", note: "", reason: "" });
+const form = reactive({ cidrText: "", note: "", reason: "" });
 const filter = ref("");
 
 const shown = computed(() => {
@@ -29,14 +30,36 @@ async function load() {
     loading.value = false;
   }
 }
+// 貼り付けた値を1件ずつに分け、送る前に確かめる（誤りがあれば、どの値かを示す）
+const items = computed(() =>
+  splitIpList(form.cidrText).map((raw) => {
+    const c = parseCidr(raw);
+    let problem = "";
+    if (!c) problem = "形式が正しくありません";
+    else if ((c.v === 4 && c.prefix < 8) || (c.v === 6 && c.prefix < 16)) problem = "範囲が広すぎます";
+    else {
+      const me = myIp.value ? parseIp(myIp.value) : null;
+      if (me && cidrContains(c, me)) problem = "いまお使いの接続元が含まれています";
+    }
+    return { raw, text: c?.text ?? "", problem };
+  }),
+);
+const problems = computed(() => items.value.filter((i) => i.problem !== ""));
+const tooMany = computed(() => items.value.length > 50);
+
 async function add() {
   busy.value = true;
   message.value = "";
   errorMessage.value = "";
   try {
-    await $fetch<unknown>("/api/ops/ip-rules", { method: "POST", body: { ...form } });
-    message.value = `${form.cidr.trim()} を登録しました。反映まで最大30秒かかります。`;
-    Object.assign(form, { cidr: "", note: "", reason: "" });
+    const res = await $fetch<{ added: string[]; skipped: string[] }>("/api/ops/ip-rules", {
+      method: "POST",
+      body: { cidrs: items.value.map((i) => i.raw), note: form.note, reason: form.reason },
+    });
+    message.value =
+      `${res.added.length}件を登録しました。反映まで最大30秒かかります。` +
+      (res.skipped.length > 0 ? `（すでに登録済みのため読み飛ばし：${res.skipped.join("、")}）` : "");
+    Object.assign(form, { cidrText: "", note: "", reason: "" });
     await load();
   } catch (e: any) {
     errorMessage.value = apiErrorMessage(e);
@@ -80,13 +103,21 @@ onMounted(load);
 
       <section class="panel">
         <h2>追加する</h2>
+        <label for="ip-list">IPアドレスまたは範囲（複数まとめて貼り付けできます）</label>
+        <textarea id="ip-list" v-model="form.cidrText" rows="6" autocomplete="off" spellcheck="false"
+          placeholder="例：&#10;198.51.100.7&#10;198.51.100.0/24&#10;203[.]0[.]113[.]5" />
+        <p class="note">区切りは、改行・カンマ・スペースのどれでも構いません。一度に50件までです。注意喚起の文書にある <code>203[.]0[.]113[.]5</code> の書き方も、そのまま貼れます。範囲で指定する場合は、末尾を0にしてください（192.168.1.0/24）。</p>
+        <p v-if="items.length > 0 && problems.length === 0 && !tooMany" class="note">{{ items.length }}件を登録します：<code>{{ items.map((i) => i.text).join("、") }}</code></p>
+        <ul v-if="problems.length > 0" class="error" role="alert">
+          <li v-for="i in problems" :key="i.raw"><code>{{ i.raw }}</code>：{{ i.problem }}</li>
+        </ul>
+        <p v-if="tooMany" class="error" role="alert">一度に登録できるのは50件までです（いま{{ items.length }}件）。分けて登録してください。</p>
         <div class="grid">
-          <label>IPアドレスまたは範囲<input v-model="form.cidr" placeholder="例：198.51.100.7 または 198.51.100.0/24" autocomplete="off" /></label>
-          <label>メモ（任意）<input v-model="form.note" maxlength="200" placeholder="例：JPCERT 注意喚起 2026-10-08" autocomplete="off" /></label>
+          <label>メモ（任意。すべての値に付きます）<input v-model="form.note" maxlength="200" placeholder="例：JPCERT 注意喚起 2026-10-08" autocomplete="off" /></label>
         </div>
         <label for="ip-reason">理由（必須）</label>
         <input id="ip-reason" v-model="form.reason" maxlength="500" placeholder="例：注意喚起で名指しされた接続元のため" />
-        <button type="button" :disabled="busy || form.cidr.trim() === '' || form.reason.trim() === ''" @click="add">拒否リストに追加</button>
+        <button type="button" :disabled="busy || items.length === 0 || problems.length > 0 || tooMany || form.reason.trim() === ''" @click="add">{{ items.length > 1 ? `${items.length}件を拒否リストに追加` : "拒否リストに追加" }}</button>
       </section>
 
       <section class="panel">
@@ -118,6 +149,7 @@ onMounted(load);
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
 th { font-size: 12px; color: var(--muted); }
+textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 14px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 16px; }
 button { width: auto; padding: 8px 16px; }
 button.small { margin: 0; padding: 4px 10px; font-size: 13px; }

@@ -4,6 +4,7 @@ import { parseCidr, type ParsedCidr } from "../../utils/ipCidr";
 
 export const MAX_BLOCK_RULES = 500;
 export const MAX_ALLOW_RULES = 50;
+export const MAX_BULK_RULES = 50;   // 拒否リストを1回でまとめて登録できる件数
 
 export function requireCidr(value: unknown): ParsedCidr {
   const c = typeof value === "string" ? parseCidr(value) : null;
