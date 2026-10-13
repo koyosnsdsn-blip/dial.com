@@ -1,0 +1,321 @@
+<title>ダイヤル.com 機能一覧</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@500;700&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* 構成：上に状態の集計（区分ごとの積み上げ）、絞り込み、区分→業務ごとの表。行を開くと説明と編集欄 */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --ink: #1d2430;
+  --muted: #5d6676;
+  --line: #dde1e7;
+  --accent: #23415f;
+  --done: #2f7a4f;    --done-bg: #dcefe3;
+  --prov: #9a6a00;    --prov-bg: #f7ecd2;
+  --part: #2c5f9e;    --part-bg: #dde8f6;
+  --none: #a23a3a;    --none-bg: #f6dede;
+  --f-head: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  --f-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  --f-mono: "JetBrains Mono", "BIZ UDGothic", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a2029; --ink: #e6e9ee; --muted: #9aa3b2; --line: #2e3643; --accent: #9cc3ea;
+    --done: #8fd3a9; --done-bg: #1e3a2a; --prov: #f0c46a; --prov-bg: #3a2f17;
+    --part: #9cc0ee; --part-bg: #1f2f45; --none: #f0a0a0; --none-bg: #432222;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a2029; --ink: #e6e9ee; --muted: #9aa3b2; --line: #2e3643; --accent: #9cc3ea;
+  --done: #8fd3a9; --done-bg: #1e3a2a; --prov: #f0c46a; --prov-bg: #3a2f17;
+  --part: #9cc0ee; --part-bg: #1f2f45; --none: #f0a0a0; --none-bg: #432222;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.65; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 28px 20px 64px; display: grid; gap: 22px; }
+h1, h2, h3 { font-family: var(--f-head); margin: 0; text-wrap: balance; }
+h1 { font-size: 1.75rem; letter-spacing: 0.02em; }
+h2 { font-size: 1.15rem; }
+.lead { color: var(--muted); max-width: 70ch; margin: 6px 0 0; }
+.meta { font-size: 0.82rem; color: var(--muted); margin: 4px 0 0; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.summary { display: grid; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.totals { display: flex; flex-wrap: wrap; gap: 18px; align-items: baseline; }
+.totals .n { font-family: var(--f-head); font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.totals .k { font-size: 0.82rem; color: var(--muted); margin-left: 4px; }
+.bars { display: grid; gap: 6px; }
+.bar-row { display: grid; grid-template-columns: 170px minmax(0, 1fr) 46px; gap: 10px; align-items: center; font-size: 0.85rem; }
+.bar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; background: var(--line); }
+.bar span { display: block; height: 100%; }
+.bar-row .c { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.s-done { background: var(--done); } .s-prov { background: var(--prov); } .s-part { background: var(--part); } .s-none { background: var(--none); }
+.keys { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.8rem; color: var(--muted); }
+.keys i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+.filters { display: grid; gap: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chips .lbl { font-size: 0.8rem; color: var(--muted); margin-right: 4px; min-width: 3.5em; }
+.chip { border: 1px solid var(--line); background: var(--surface); padding: 4px 11px; border-radius: 999px; font-size: 0.84rem; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.search { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.search input { flex: 1 1 260px; min-width: 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--bg); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 0.88rem; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+.group { display: grid; gap: 8px; }
+.group h2 { display: flex; gap: 10px; align-items: baseline; }
+.group h2 small { font-family: var(--f-body); font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; min-width: 900px; table-layout: fixed; }
+col.c-id { width: 52px; } col.c-scr { width: 200px; } col.c-st { width: 150px; } col.c-req { width: 130px; } col.c-note { width: 24%; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 0.88rem; }
+th { font-size: 0.76rem; color: var(--muted); font-weight: 700; letter-spacing: 0.04em; background: color-mix(in srgb, var(--line) 35%, var(--surface)); }
+tr.sub td { background: color-mix(in srgb, var(--line) 22%, var(--surface)); font-weight: 700; font-size: 0.8rem; color: var(--muted); padding: 6px 12px; }
+td.id { font-family: var(--f-body); font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+td.name button { all: unset; cursor: pointer; font-weight: 700; color: var(--ink); }
+td.name button:focus-visible { outline: 2px solid var(--accent); }
+td.name .desc { display: block; color: var(--muted); font-size: 0.82rem; font-weight: 400; margin-top: 2px; }
+td code { font-family: var(--f-mono); font-size: 0.76rem; overflow-wrap: anywhere; }
+.pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 700; white-space: nowrap; }
+.p-done { color: var(--done); background: var(--done-bg); } .p-prov { color: var(--prov); background: var(--prov-bg); }
+.p-part { color: var(--part); background: var(--part-bg); } .p-none { color: var(--none); background: var(--none-bg); }
+td.note { color: var(--muted); font-size: 0.82rem; }
+td.note .memo { display: block; color: var(--ink); margin-top: 4px; white-space: pre-wrap; }
+tr.detail td { background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 14px; }
+.edit label { display: grid; gap: 3px; font-size: 0.78rem; color: var(--muted); }
+.edit input, .edit select, .edit textarea { padding: 6px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--ink); font-size: 0.88rem; }
+.edit textarea { min-height: 64px; resize: vertical; }
+.edit .wide { grid-column: 1 / -1; }
+.edit .actions { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.status-msg { font-size: 0.82rem; color: var(--muted); }
+.empty { padding: 28px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 8px; }
+.add { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: grid; gap: 10px; }
+
+@media (max-width: 640px) {
+  .bar-row { grid-template-columns: 1fr 40px; }
+  .bar-row .t { grid-column: 1 / -1; }
+}
+</style>
+
+<div class="wrap" lang="ja">
+  <header>
+    <h1>ダイヤル.com 機能一覧</h1>
+    <p class="lead">相談者側・運営画面・先生・クライアント管理サイト・定期処理ごとに、機能と実装の状態をまとめた表です。行の名前を押すと説明が開き、状態やメモを書き換えられます。</p>
+    <p class="meta">初版は2026年10月13日時点のコード・要件定義書 v6.9・未決事項一覧から作成。要件の数字は要件定義書の章番号、「2.xx」は未決事項一覧の節。<span id="flow-link">操作フローとシステムの図は<a href="https://claude.ai/artifact/5M8Es5gwV9qm9nUv8NRr2E">ダイヤル.com フロー図</a>。</span></p>
+  </header>
+
+  <section class="summary" aria-label="状態の集計" id="summary">
+    <div class="totals" id="totals"><span class="k">読み込み中…</span></div>
+    <div class="bars" id="bars"></div>
+    <div class="keys">
+      <span><i class="s-done"></i>実装済み</span>
+      <span><i class="s-prov"></i>実装済み（仮置き）：未決事項の仮の前提で動いている</span>
+      <span><i class="s-part"></i>一部実装</span>
+      <span><i class="s-none"></i>未実装</span>
+    </div>
+  </section>
+
+  <section class="filters" aria-label="絞り込み">
+    <div class="chips" id="f-area"><span class="lbl">区分</span></div>
+    <div class="chips" id="f-status"><span class="lbl">状態</span></div>
+    <div class="search">
+      <input id="q" type="search" placeholder="機能名・画面・要件の番号・未決事項で探す（例：通知、/ops/qa、No.59）" aria-label="キーワードで探す">
+      <button class="btn ghost" id="toggle-add" type="button" hidden>機能を追加</button>
+    </div>
+  </section>
+
+  <section class="add" id="add-panel" hidden aria-label="機能の追加">
+    <h2>機能を追加</h2>
+    <div class="edit" id="add-form"></div>
+  </section>
+
+  <div id="list"><div class="empty">表を読み込んでいます。表示されない場合は、ページを開き直してください。</div></div>
+</div>
+
+<script>
+document.documentElement.lang = "ja";
+const STATUSES = [
+  { key: "実装済み", cls: "done" },
+  { key: "実装済み（仮置き）", cls: "prov" },
+  { key: "一部実装", cls: "part" },
+  { key: "未実装", cls: "none" }
+];
+const AREAS = ["相談者側", "運営画面", "先生の画面", "クライアント管理サイト", "定期処理・外部連携"];
+const FIELDS = [
+  ["name", "機能名", "input"], ["area", "区分", "area"], ["group", "業務", "input"], ["status", "状態", "status"],
+  ["who", "使う人", "input"], ["url", "画面", "input"], ["req", "要件", "input"], ["issues", "関係する未決事項", "input"],
+  ["desc", "説明", "textarea"], ["note", "備考", "textarea"], ["memo", "メモ（担当・確認事項など）", "textarea"]
+];
+const PREFIX = { "相談者側": "F", "運営画面": "O", "先生の画面": "E", "クライアント管理サイト": "C", "定期処理・外部連携": "S" };
+
+let rows = [];
+let pending = false;
+document.addEventListener("focusout", () => setTimeout(() => {
+  if (pending && !(document.activeElement && document.activeElement.closest(".edit"))) { pending = false; render(); }
+}, 0));
+let db = null, canWrite = false, openId = null, loaded = false;
+const filt = { area: new Set(), status: new Set(), q: "" };
+try { const s = JSON.parse(localStorage.getItem("feat-filter") || "{}"); (s.area || []).forEach((a) => filt.area.add(a)); (s.status || []).forEach((a) => filt.status.add(a)); filt.q = s.q || ""; } catch (_) {}
+document.getElementById("q").value = filt.q;
+
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const stCls = (s) => (STATUSES.find((x) => x.key === s) || { cls: "part" }).cls;
+const saveFilter = () => { try { localStorage.setItem("feat-filter", JSON.stringify({ area: [...filt.area], status: [...filt.status], q: filt.q })); } catch (_) {} };
+
+function renderChips() {
+  const a = document.getElementById("f-area"), s = document.getElementById("f-status");
+  a.innerHTML = `<span class="lbl">区分</span>` + AREAS.map((x) => `<button class="chip" type="button" data-k="area" data-v="${esc(x)}" aria-pressed="${filt.area.has(x)}">${esc(x)}</button>`).join("");
+  s.innerHTML = `<span class="lbl">状態</span>` + STATUSES.map((x) => `<button class="chip" type="button" data-k="status" data-v="${esc(x.key)}" aria-pressed="${filt.status.has(x.key)}">${esc(x.key)}</button>`).join("");
+}
+
+function renderSummary() {
+  const tot = document.getElementById("totals"), bars = document.getElementById("bars");
+  if (!rows.length) { tot.innerHTML = `<span class="k">${loaded ? "まだ機能が登録されていません" : "読み込み中…"}</span>`; bars.innerHTML = ""; return; }
+  const count = (list, k) => list.filter((r) => r.status === k).length;
+  tot.innerHTML = `<span><span class="n">${rows.length}</span><span class="k">機能</span></span>` + STATUSES.map((x) => `<span><span class="n">${count(rows, x.key)}</span><span class="k">${esc(x.key)}</span></span>`).join("");
+  bars.innerHTML = AREAS.map((area) => {
+    const list = rows.filter((r) => r.area === area);
+    if (!list.length) return "";
+    const seg = STATUSES.map((x) => { const c = count(list, x.key); return c ? `<span class="s-${x.cls}" style="width:${(c / list.length) * 100}%" title="${esc(x.key)} ${c}件"></span>` : ""; }).join("");
+    return `<div class="bar-row"><span class="t">${esc(area)}</span><div class="bar" role="img" aria-label="${esc(area)}：${STATUSES.map((x) => `${x.key}${count(list, x.key)}件`).join("、")}">${seg}</div><span class="c">${list.length}</span></div>`;
+  }).join("");
+}
+
+function matches(r) {
+  if (filt.area.size && !filt.area.has(r.area)) return false;
+  if (filt.status.size && !filt.status.has(r.status)) return false;
+  if (filt.q) {
+    const hay = [r.id, r.name, r.desc, r.group, r.who, r.url, r.req, r.issues, r.note, r.memo].join(" ").toLowerCase();
+    if (!filt.q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w))) return false;
+  }
+  return true;
+}
+
+function editForm(r, mode) {
+  return FIELDS.map(([k, label, type]) => {
+    const id = `${mode}-${k}`;
+    const v = r[k] ?? "";
+    const wide = type === "textarea" ? " wide" : "";
+    let ctl;
+    if (type === "status") ctl = `<select id="${id}" data-f="${k}">${STATUSES.map((x) => `<option${x.key === v ? " selected" : ""}>${esc(x.key)}</option>`).join("")}</select>`;
+    else if (type === "area") ctl = `<select id="${id}" data-f="${k}">${AREAS.map((x) => `<option${x === v ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
+    else if (type === "textarea") ctl = `<textarea id="${id}" data-f="${k}">${esc(v)}</textarea>`;
+    else ctl = `<input id="${id}" data-f="${k}" value="${esc(v)}">`;
+    return `<label class="${wide.trim()}" for="${id}">${esc(label)}${ctl}</label>`;
+  }).join("") + `<div class="actions"><button class="btn" type="button" data-act="${mode === "add" ? "create" : "save"}">${mode === "add" ? "追加する" : "保存する"}</button>${mode === "add" ? "" : `<button class="btn ghost" type="button" data-act="close">閉じる</button>`}<span class="status-msg" id="${mode}-msg"></span></div>`;
+}
+
+function renderList() {
+  const el = document.getElementById("list");
+  if (!rows.length) {
+    el.innerHTML = `<div class="empty">${loaded ? "まだ機能が登録されていません。" + (canWrite ? "「機能を追加」から登録できます。" : "") : db === false ? "この表示では表のデータを読み込めません。claude.ai にサインインして開いてください。" : "表を読み込んでいます…"}</div>`;
+    return;
+  }
+  const shown = rows.filter(matches);
+  if (!shown.length) { el.innerHTML = `<div class="empty">条件に合う機能はありません。絞り込みを外してください。</div>`; return; }
+  el.innerHTML = AREAS.map((area) => {
+    const list = shown.filter((r) => r.area === area);
+    if (!list.length) return "";
+    const groups = [...new Set(list.map((r) => r.group || "その他"))];
+    let body = "";
+    groups.forEach((g) => {
+      body += `<tr class="sub"><td colspan="6">${esc(g)}</td></tr>`;
+      list.filter((r) => (r.group || "その他") === g).forEach((r) => {
+        body += `<tr>
+          <td class="id">${esc(r.id)}</td>
+          <td class="name"><button type="button" data-open="${esc(r.id)}" aria-expanded="${openId === r.id}">${esc(r.name)}</button><span class="desc">${esc(r.desc)}</span></td>
+          <td>${r.url && r.url !== "—" ? `<code>${esc(r.url)}</code>` : `<span class="status-msg">画面なし</span>`}<div class="status-msg">${esc(r.who)}</div></td>
+          <td><span class="pill p-${stCls(r.status)}">${esc(r.status)}</span></td>
+          <td><code>${esc(r.req)}</code>${r.issues ? `<div class="status-msg">${esc(r.issues)}</div>` : ""}</td>
+          <td class="note">${esc(r.note)}${r.memo ? `<span class="memo">メモ：${esc(r.memo)}</span>` : ""}</td>
+        </tr>`;
+        if (openId === r.id) {
+          body += `<tr class="detail"><td></td><td colspan="5">${canWrite ? `<div class="edit" data-id="${esc(r.id)}">${editForm(r, "e")}</div>` : `<p class="status-msg">${esc(r.desc)}<br>この表を書き換える権限がありません（閲覧のみ）。</p>`}${r.updatedAt ? `<p class="status-msg">最終更新：${esc(new Date(r.updatedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))}</p>` : ""}</td></tr>`;
+        }
+      });
+    });
+    return `<section class="group"><h2>${esc(area)}<small>${list.length}件</small></h2><div class="table-wrap"><table><colgroup><col class="c-id"><col><col class="c-scr"><col class="c-st"><col class="c-req"><col class="c-note"></colgroup>
+      <thead><tr><th>ID</th><th>機能</th><th>画面・使う人</th><th>状態</th><th>要件・未決事項</th><th>備考</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+  }).join("");
+}
+
+function render() { renderSummary(); renderList(); }
+
+function readForm(root) {
+  const out = {};
+  root.querySelectorAll("[data-f]").forEach((c) => { out[c.dataset.f] = c.value.trim(); });
+  return out;
+}
+
+document.addEventListener("click", async (e) => {
+  const chip = e.target.closest(".chip");
+  if (chip) {
+    const set = filt[chip.dataset.k];
+    set.has(chip.dataset.v) ? set.delete(chip.dataset.v) : set.add(chip.dataset.v);
+    saveFilter(); renderChips(); renderList(); return;
+  }
+  const op = e.target.closest("[data-open]");
+  if (op) { openId = openId === op.dataset.open ? null : op.dataset.open; renderList(); return; }
+  const act = e.target.closest("[data-act]");
+  if (!act) return;
+  if (act.dataset.act === "close") { openId = null; renderList(); return; }
+  if (act.dataset.act === "save") {
+    const box = act.closest(".edit"); const id = box.dataset.id; const msg = document.getElementById("e-msg");
+    const data = readForm(box);
+    if (!data.name) { msg.textContent = "機能名を入れてください。"; return; }
+    act.disabled = true; msg.textContent = "保存しています…";
+    try { await db.doc("features/" + id).update({ ...data, updatedAt: new Date().toISOString() }); msg.textContent = "保存しました。"; }
+    catch (err) { msg.textContent = err && err.code === "invalid_argument" ? "保存できませんでした。この表を書き換える権限がない可能性があります。" : "保存できませんでした。時間をおいてもう一度お試しください。"; act.disabled = false; }
+    return;
+  }
+  if (act.dataset.act === "create") {
+    const box = document.getElementById("add-form"); const msg = document.getElementById("add-msg");
+    const data = readForm(box);
+    if (!data.name) { msg.textContent = "機能名を入れてください。"; return; }
+    const p = PREFIX[data.area] || "X";
+    const nums = rows.filter((r) => r.id.startsWith(p)).map((r) => Number(r.id.slice(1)) || 0);
+    const id = p + String((nums.length ? Math.max(...nums) : 0) + 1).padStart(2, "0");
+    act.disabled = true; msg.textContent = "追加しています…";
+    try {
+      await db.doc("features/" + id).set({ ...data, order: rows.length + 1, updatedAt: new Date().toISOString() });
+      msg.textContent = `${id} として追加しました。`;
+      box.querySelectorAll("input, textarea").forEach((c) => (c.value = ""));
+    } catch (err) { msg.textContent = err && err.code === "quota_exceeded" ? "これ以上追加できません。不要な行を整理してください。" : "追加できませんでした。時間をおいてもう一度お試しください。"; }
+    act.disabled = false;
+  }
+});
+document.getElementById("toggle-add").addEventListener("click", () => {
+  const panel = document.getElementById("add-panel");
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) document.getElementById("add-form").innerHTML = editForm({ status: "未実装", area: "運営画面" }, "add");
+});
+let qTimer = null;
+document.getElementById("q").addEventListener("input", (e) => { clearTimeout(qTimer); qTimer = setTimeout(() => { filt.q = e.target.value.trim(); saveFilter(); renderList(); }, 200); });
+
+renderChips(); render();
+
+(async () => {
+  if (!window.claude || !window.claude.use) { db = false; loaded = true; render(); return; }
+  const [store, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+  if (!store) { db = false; loaded = true; render(); return; }
+  db = store;
+  const w = user ? await user.can("data.write") : null;
+  canWrite = w !== false;
+  document.getElementById("toggle-add").hidden = !canWrite;
+  db.collection("features").onSnapshot((snap) => {
+    rows = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999) || a.id.localeCompare(b.id));
+    loaded = true;
+    // 入力中は表を作り直さない（入力が消えないように）。入力欄を離れたときに反映する
+    if (document.activeElement && document.activeElement.closest(".edit")) { pending = true; renderSummary(); }
+    else render();
+  }, () => { loaded = true; render(); });
+})();
+</script>

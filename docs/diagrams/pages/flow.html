@@ -1,0 +1,348 @@
+<title>ダイヤル.com フロー図</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@500;700&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* 構成：上に場面のタブ、下に縦の列（スイムレーン）。手順は上から下へ番号順。後半にシステム図への入口 */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #1d2430;
+  --muted: #5d6676;
+  --line: #d9dde4;
+  --accent: #23415f;
+  --user-bg: #d7effb;  --user-ink: #0d5a86;  --user-edge: #7cc3e8;
+  --dial-bg: #f6dcef;  --dial-ink: #8c1f62;  --dial-edge: #e19ccb;
+  --corp-bg: #dff2d6;  --corp-ink: #2f6b1f;  --corp-edge: #9fd18b;
+  --expert-bg: #e7e2f7; --expert-ink: #4b3a8f; --expert-edge: #b3a6e3;
+  --warn: #9a5b00;
+  --f-head: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  --f-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  --f-mono: "JetBrains Mono", "BIZ UDGothic", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a2029; --ink: #e6e9ee; --muted: #9aa3b2; --line: #2e3643; --accent: #9cc3ea;
+    --user-bg: #13324a; --user-ink: #9fd6f6; --user-edge: #2f6f98;
+    --dial-bg: #3d1a33; --dial-ink: #f2b3dc; --dial-edge: #8a3d72;
+    --corp-bg: #1d3519; --corp-ink: #b7e3a4; --corp-edge: #4c7f3c;
+    --expert-bg: #2a2547; --expert-ink: #cbc0f5; --expert-edge: #5e529c;
+    --warn: #f0b860;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a2029; --ink: #e6e9ee; --muted: #9aa3b2; --line: #2e3643; --accent: #9cc3ea;
+  --user-bg: #13324a; --user-ink: #9fd6f6; --user-edge: #2f6f98;
+  --dial-bg: #3d1a33; --dial-ink: #f2b3dc; --dial-edge: #8a3d72;
+  --corp-bg: #1d3519; --corp-ink: #b7e3a4; --corp-edge: #4c7f3c;
+  --expert-bg: #2a2547; --expert-ink: #cbc0f5; --expert-edge: #5e529c;
+  --warn: #f0b860;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.7; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 64px; display: grid; gap: 28px; }
+h1, h2, h3 { font-family: var(--f-head); text-wrap: balance; margin: 0; }
+h1 { font-size: 1.75rem; letter-spacing: 0.02em; }
+h2 { font-size: 1.25rem; }
+.lead { color: var(--muted); max-width: 68ch; margin: 6px 0 0; }
+.meta { font-size: 0.82rem; color: var(--muted); }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab { font: inherit; font-size: 0.92rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 14px; border-radius: 6px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 700; }
+.scene-head { display: grid; gap: 4px; }
+.scene-head p { margin: 0; color: var(--muted); max-width: 80ch; }
+
+.flow { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.lanes { display: grid; grid-template-columns: 44px repeat(var(--n), minmax(0, 1fr)); }
+.lane-head { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 3; padding: 8px 10px; font-family: var(--f-head); font-weight: 700; font-size: 0.86rem; text-align: center; border-bottom: 1px solid var(--line); }
+.lane-head small { display: block; font-family: var(--f-body); font-weight: 400; font-size: 0.74rem; opacity: 0.85; }
+.gutter-head { background: var(--surface); border-bottom: 1px solid var(--line); }
+.cell { padding: 14px 12px; min-width: 0; position: relative; z-index: 1; }
+.num { display: flex; justify-content: center; align-items: flex-start; padding-top: 22px; font-family: var(--f-mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; position: relative; z-index: 1; }
+.lane-user { background: var(--user-bg); color: var(--user-ink); }
+.lane-dial { background: var(--dial-bg); color: var(--dial-ink); }
+.lane-corp { background: var(--corp-bg); color: var(--corp-ink); }
+.lane-expert { background: var(--expert-bg); color: var(--expert-ink); }
+.col-user { background: color-mix(in srgb, var(--user-bg) 45%, var(--surface)); }
+.col-dial { background: color-mix(in srgb, var(--dial-bg) 45%, var(--surface)); }
+.col-corp { background: color-mix(in srgb, var(--corp-bg) 45%, var(--surface)); }
+.col-expert { background: color-mix(in srgb, var(--expert-bg) 45%, var(--surface)); }
+.col-user, .col-dial, .col-corp, .col-expert { border-left: 1px solid var(--line); }
+
+.step { background: var(--surface); color: var(--ink); border: 1.5px solid var(--edge); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; max-width: 360px; margin: 0 auto; box-shadow: 0 1px 0 color-mix(in srgb, var(--edge) 60%, transparent); }
+.step[data-lane="user"] { --edge: var(--user-edge); --chip: var(--user-ink); }
+.step[data-lane="dial"] { --edge: var(--dial-edge); --chip: var(--dial-ink); }
+.step[data-lane="corp"] { --edge: var(--corp-edge); --chip: var(--corp-ink); }
+.step[data-lane="expert"] { --edge: var(--expert-edge); --chip: var(--expert-ink); }
+.step.branch { border-style: dashed; }
+.step h3 { font-size: 0.95rem; line-height: 1.45; }
+.step .who { font-size: 0.72rem; color: var(--chip); font-weight: 700; letter-spacing: 0.04em; }
+.step .screen { font-size: 0.8rem; color: var(--muted); }
+.step code { font-family: var(--f-mono); font-size: 0.76rem; overflow-wrap: anywhere; color: var(--ink); background: color-mix(in srgb, var(--edge) 22%, transparent); padding: 1px 5px; border-radius: 3px; }
+.step .note { font-size: 0.8rem; color: var(--muted); margin: 0; }
+.step .tag { justify-self: start; font-size: 0.7rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--warn); color: var(--warn); }
+.step .tag.branch-tag { border-color: var(--chip); color: var(--chip); }
+svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; overflow: visible; }
+svg.wires path { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+svg.wires path.dashed { stroke-dasharray: 5 4; }
+svg.wires polygon { fill: var(--muted); stroke: none; }
+
+.notes { display: grid; gap: 6px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.notes h3 { font-size: 0.95rem; }
+.notes ul { margin: 0; padding-left: 1.2em; color: var(--muted); font-size: 0.88rem; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.82rem; color: var(--muted); align-items: center; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 22px; height: 12px; border-radius: 3px; border: 1.5px solid var(--muted); display: inline-block; }
+.legend i.dash { border-style: dashed; }
+
+.sys { display: grid; gap: 12px; }
+.sys-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.sys-card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.sys-card h3 { font-size: 1rem; }
+.sys-card p { margin: 0; font-size: 0.88rem; color: var(--muted); }
+.sys-card .kind { font-family: var(--f-mono); font-size: 0.72rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.sys-card a { font-weight: 700; justify-self: start; }
+
+@media (max-width: 760px) {
+  .lanes { grid-template-columns: 34px minmax(0, 1fr); }
+  .lane-head, .gutter-head { display: none; }
+  .cell.empty { display: none; }
+  .cell { background: transparent !important; border-left: 0 !important; padding: 8px 8px 8px 0; }
+  .num { padding-top: 16px; }
+  .step { max-width: none; margin: 0; }
+  svg.wires { display: none; }
+  .mobile-legend { display: flex !important; }
+}
+.mobile-legend { display: none; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 0.78rem; }
+.mobile-legend b { padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap" lang="ja">
+  <header>
+    <h1>ダイヤル.com フロー図</h1>
+    <p class="lead">誰が、どの画面で、どの順に操作するかを、一通りの流れとしてまとめました。業務フローを作るときの土台に使ってください。色は操作する人を表します。</p>
+    <p class="meta">2026年10月13日時点の開発環境（dial.com-op-dev）の実装にもとづく。URL は画面のパス。「仮置き」「未実装」は、未決事項一覧の仮の前提や、まだ作っていない部分。</p>
+  </header>
+
+  <section aria-labelledby="ops-title" style="display:grid;gap:14px">
+    <h2 id="ops-title">操作フロー</h2>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="scene-head" id="scene-head"></div>
+    <div class="legend" aria-hidden="true">
+      <span><i></i>主な流れ</span>
+      <span><i class="dash"></i>場合によって行う操作（分岐）</span>
+    </div>
+    <div class="flow" id="flow"></div>
+    <div class="notes" id="scene-notes"></div>
+  </section>
+
+  <section class="sys" aria-labelledby="sys-title">
+    <h2 id="sys-title">システムの図</h2>
+    <p class="lead" style="margin:0">画面の裏で、どの仕組みがどう動くかの図です。開発・インフラの確認用。各図の「出典」から、根拠のコード（GitHub）を開けます。</p>
+    <div class="sys-grid">
+      <article class="sys-card">
+        <span class="kind">構成図</span>
+        <h3>全体構成</h3>
+        <p>使う人、画面（1つのホスト）、サーバールート、Supabase（認証・DB・Realtime・保管先・定期処理）のつながり。</p>
+        <a href="diagrams/architecture.html">図を開く</a>
+      </article>
+      <article class="sys-card">
+        <span class="kind">処理の流れ</span>
+        <h3>相談（機能2）の流れ</h3>
+        <p>相談者・アプリの自動処理・相談員・運営管理者の行で、開始から終了までの処理を追う。</p>
+        <a href="diagrams/consult-flow.html">図を開く</a>
+      </article>
+      <article class="sys-card">
+        <span class="kind">シーケンス図</span>
+        <h3>メッセージの送信と相談員への通知</h3>
+        <p>送信が監査ログ・DB・Realtime を通って運営画面に届き、取り直されるまでの順番。</p>
+        <a href="diagrams/message-sequence.html">図を開く</a>
+      </article>
+      <article class="sys-card">
+        <span class="kind">状態遷移</span>
+        <h3>相談（案件）の状態</h3>
+        <p>開始・対応中・終了と、緊急フラグ、削除から完全な消去まで。終了の理由の一覧つき。</p>
+        <a href="diagrams/case-lifecycle.html">図を開く</a>
+      </article>
+    </div>
+    <p class="meta" id="features-link">機能ごとの実装の状態は<a href="https://claude.ai/artifact/PYo5EnLkJg6SNd8NnC6c1e">ダイヤル.com 機能一覧</a>で管理しています。</p>
+  </section>
+</div>
+
+<script>
+document.documentElement.lang = "ja";
+const LANES = {
+  user:   { label: "相談者", sub: "一般・企業会員（相談者側の画面）" },
+  dial:   { label: "ダイヤル・サービス", sub: "相談員・運営管理者（運営画面 /ops）" },
+  corp:   { label: "企業担当者", sub: "クライアント管理者（/client-admin）" },
+  expert: { label: "先生", sub: "弁護士・社労士など（/ops/expert）" }
+};
+// kind: main（主な流れ）／branch（分岐。前の主な手順から点線でつなぐ。次の主な手順は分岐の前からつながる）
+const SCENES = [
+  {
+    id: "corp-consult", name: "企業会員の相談",
+    desc: "勤務先から招待コードを受け取った従業員が相談し、終了するまで。企業担当者には、誰が相談したかも内容も伝わらない。",
+    lanes: ["user", "dial", "corp"],
+    steps: [
+      { lane: "corp", title: "従業員に招待コードを案内する", screen: "クライアント管理サイト", url: "/client-admin", note: "招待コードは参照のみ。再発行は運営に依頼" },
+      { lane: "user", title: "勤務先の案内ページを開く", screen: "クライアント別ランディングページ", url: "/c/[コード]", note: "勤務先に伝わる情報・伝わらない情報が固定で表示される" },
+      { lane: "user", title: "招待コードで登録する", screen: "招待コードをお持ちの方", url: "/start/invite" },
+      { lane: "user", title: "相談を始める", screen: "相談の開始", url: "/consult/start", note: "説明 → 初回アンケート（全問に「答えない」あり）。自治体委託型は報告への同意", tag: "文面・設問は仮" },
+      { lane: "user", title: "メッセージを送る", screen: "メッセージボックス", url: "/consult/[id]", note: "画像は1通3枚まで。担当は自動で割り当て（前回の担当を優先）" },
+      { lane: "dial", title: "新着に気づく", screen: "ダッシュボード", url: "/ops", note: "即時に一覧へ反映。通知音は本人が設定" },
+      { lane: "dial", title: "内容を読んで返信する", screen: "案件詳細", url: "/ops/cases/[id]", note: "アンケートの回答、過去の相談、下書き・テンプレート" },
+      { lane: "dial", kind: "branch", title: "危険の兆候があれば緊急フラグを立てる", screen: "案件詳細", url: "/ops/cases/[id]", note: "理由が必須。運営管理者のダッシュボードで最上位に固定" },
+      { lane: "user", title: "返信を読み、やり取りを続ける", screen: "メッセージボックス", url: "/consult/[id]", note: "残りの往復回数・担当者の名前は表示しない" },
+      { lane: "dial", title: "対応を完了する", screen: "案件詳細", url: "/ops/cases/[id]", note: "往復の上限に達したとき・14日やり取りがないとき（企業枠）も終了する" },
+      { lane: "user", title: "終了の案内を見る／新しく相談する", screen: "メッセージボックス", url: "/consult/[id]", note: "同じ画面から新しい相談を始められる（企業枠は費用なし）" },
+      { lane: "corp", title: "四半期レポートで件数を見る", screen: "クライアント管理サイト", url: "/client-admin", note: "四半期ごとの集計だけ。少ない件数の内訳は出さない" }
+    ],
+    notes: ["企業担当者が見られるのは、登録件数と四半期の集計だけ。相談の内容・誰が相談したか・期の途中の数値は、画面にもAPIにも経路がない。", "メールでの通知は未実装（メール配信サービスが未決）。相談者は画面を開いて返信を確認する。"]
+  },
+  {
+    id: "general-consult", name: "一般の相談",
+    desc: "招待コードを持たない方が、ニックネームで登録して相談し、記録を管理するまで。",
+    lanes: ["user", "dial"],
+    steps: [
+      { lane: "user", title: "トップで入口を選ぶ", screen: "トップ", url: "/", note: "ニックネーム・招待コード・メールアドレスの3つの入口" },
+      { lane: "user", title: "ニックネームで登録する", screen: "ニックネームではじめる", url: "/start/nickname", note: "メールアドレスは不要。パスワードを忘れると再設定できない", tag: "登録方式は仮置き" },
+      { lane: "user", title: "相談を始める", screen: "相談の開始", url: "/consult/start", note: "招待コードなし・費用なし（往復5回・目安24時間）", tag: "仮置き：有料（5,000円）は未実装" },
+      { lane: "user", title: "メッセージを送る", screen: "メッセージボックス", url: "/consult/[id]" },
+      { lane: "dial", title: "返信する", screen: "案件詳細", url: "/ops/cases/[id]" },
+      { lane: "user", title: "返信を読み、やり取りを続ける", screen: "メッセージボックス", url: "/consult/[id]" },
+      { lane: "user", kind: "branch", title: "自分で相談を終了する", screen: "メッセージボックス", url: "/consult/[id]", note: "終了後も読み返せる" },
+      { lane: "user", title: "履歴の確認・削除・データの出力", screen: "マイページ", url: "/mypage", note: "削除すると即時に非表示。自分のデータは24時間に3回まで出力（仮）" },
+      { lane: "dial", title: "削除の状況を確認する", screen: "削除依頼の状況", url: "/ops/deletions", note: "猶予30日（仮）のあと毎日の定期処理で完全に消去。失敗は再実行" }
+    ],
+    notes: ["あとから招待コードで所属した場合、無償の相談と企業枠の相談を1件ずつ並行できる（要件 3.2.1 の例外。仮置き）。", "退会は /mypage/withdraw。運営への問い合わせは /contact（運営から返信する手段はない）。"]
+  },
+  {
+    id: "qa", name: "公開Q&A",
+    desc: "月額会員が質問を投稿し、相談員が回答して公開し、先生がコメントを寄せ、閲覧者が読むまで。",
+    lanes: ["user", "dial", "expert"],
+    steps: [
+      { lane: "user", title: "質問を投稿する", screen: "質問の投稿", url: "/qa/post", note: "月3問まで。入力中に似た質問を提示する", tag: "月額会員への切替は手動（仮）" },
+      { lane: "dial", title: "回答待ちの質問を確認する", screen: "Q&Aの回答待ち一覧", url: "/ops/qa", note: "投稿から3営業日のSLAで色分け" },
+      { lane: "dial", title: "匿名化して回答し、公開する", screen: "Q&Aの回答・公開", url: "/ops/qa/[id]", note: "却下（B/E/F）・破棄（G1〜G4）・既存Q&Aへのマージもここで" },
+      { lane: "user", kind: "branch", title: "処理の結果を確認する（投稿者）", screen: "自分の投稿", url: "/mypage/questions", note: "メールではなく画面で伝える" },
+      { lane: "expert", title: "担当ジャンルの質問にコメントを書く", screen: "質問の詳細・コメントの記入", url: "/ops/expert/questions/[id]", note: "下書き → 相談員の確認へ提出", tag: "先生コメントは仮置き" },
+      { lane: "dial", title: "先生のコメントを確認して公開する", screen: "先生のコメントの確認", url: "/ops/expert-comments", note: "差し戻し（理由つき）もできる" },
+      { lane: "user", title: "Q&Aと先生のコメントを読む", screen: "Q&Aの記事", url: "/qa/[id]", note: "全文を読めない方には冒頭30文字。無料会員は月3本まで全文" },
+      { lane: "user", kind: "branch", title: "問題があれば通報する", screen: "Q&Aの記事", url: "/qa/[id]", note: "未対応の通報が5件で自動の一時非公開（仮）" },
+      { lane: "dial", title: "通報に対応する", screen: "通報への対応", url: "/ops/qa-reports", note: "修正・非公開化・通報却下。通報者には結果を知らせない" }
+    ],
+    notes: ["企業会員はQ&Aを読むだけで、投稿はできない。", "初期アーカイブなど、投稿を経由しない記事は /ops/articles/new で運営が直接作る。"]
+  },
+  {
+    id: "client", name: "契約クライアントの導入",
+    desc: "契約クライアントを登録してから、従業員が使い始め、契約が終わるまで。",
+    lanes: ["dial", "corp", "user"],
+    steps: [
+      { lane: "dial", title: "クライアントを新規登録する", screen: "契約クライアントの一覧", url: "/ops/clients", note: "契約類型（企業契約型／自治体委託型）は登録後に変えられない。登録直後は「準備中」" },
+      { lane: "dial", title: "契約・機能・SLA・往復回数を設定する", screen: "クライアントの設定", url: "/ops/clients/[id]", note: "追加設問は /ops/clients/[id]/survey（最大2問）", tag: "承認は氏名の記録のみ（仮）" },
+      { lane: "dial", title: "ランディングページを入稿する", screen: "ランディングページの入稿", url: "/ops/clients/[id]/landing", note: "掲載コメント・連絡先・色", tag: "ロゴ画像は未対応" },
+      { lane: "dial", title: "最初のクライアント管理者を招待する", screen: "クライアントの設定", url: "/ops/clients/[id]", note: "招待リンクを本人に手渡す（メール送信は未実装）" },
+      { lane: "corp", title: "パスワードと2段階認証を設定する", screen: "パスワードの設定", url: "/ops/accept-invite", note: "そのあと /client-admin/mfa へ進む" },
+      { lane: "dial", title: "「準備中」から「有効」に切り替える", screen: "クライアントの設定", url: "/ops/clients/[id]", note: "有効にすると招待コードが使えるようになる" },
+      { lane: "corp", title: "従業員に招待コードを案内する", screen: "クライアント管理サイト", url: "/client-admin", note: "ほかの管理者の追加・削除もここで（最後の1人は削除できない）" },
+      { lane: "user", title: "招待コードで登録し、相談する", screen: "招待コードをお持ちの方", url: "/start/invite", note: "流れは「企業会員の相談」のとおり" },
+      { lane: "dial", title: "四半期レポートができる", screen: "クライアントの設定", url: "/ops/clients/[id]", note: "四半期の初日に自動で作成。直前の四半期分は作り直せる" },
+      { lane: "corp", title: "四半期レポートを見る", screen: "クライアント管理サイト", url: "/client-admin" },
+      { lane: "dial", title: "契約を終了する", screen: "クライアントの設定", url: "/ops/clients/[id]", note: "所属を一括解除（無料会員として継続）。対応中の相談は終了まで続く" }
+    ],
+    notes: ["契約終了のときのクライアント管理者アカウントの失効と、所属解除の案内メールは未実装。", "IP許可リストを設定すると、クライアント管理サイトは登録した接続元からしか使えない（/ops/clients/[id]）。"]
+  }
+];
+
+const tabsEl = document.getElementById("tabs");
+const flowEl = document.getElementById("flow");
+const headEl = document.getElementById("scene-head");
+const notesEl = document.getElementById("scene-notes");
+let current = 0;
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function renderTabs() {
+  tabsEl.innerHTML = SCENES.map((s, i) => `<button class="tab" role="tab" id="tab-${s.id}" aria-selected="${i === current}" data-i="${i}">${i + 1}. ${esc(s.name)}</button>`).join("");
+}
+
+function renderScene() {
+  const s = SCENES[current];
+  headEl.innerHTML = `<h3 style="font-size:1.05rem">${esc(s.name)}</h3><p>${esc(s.desc)}</p>`;
+  const n = s.lanes.length;
+  let html = `<div class="mobile-legend">${s.lanes.map((l) => `<b class="lane-${l}">${esc(LANES[l].label)}</b>`).join("")}</div>`;
+  html += `<div class="lanes" style="--n:${n}">`;
+  html += `<div class="gutter-head"></div>` + s.lanes.map((l) => `<div class="lane-head lane-${l}">${esc(LANES[l].label)}<small>${esc(LANES[l].sub)}</small></div>`).join("");
+  s.steps.forEach((st, i) => {
+    html += `<div class="num">${i + 1}</div>`;
+    s.lanes.forEach((l) => {
+      if (l !== st.lane) { html += `<div class="cell empty col-${l}"></div>`; return; }
+      const tags = [st.kind === "branch" ? `<span class="tag branch-tag">場合によって</span>` : "", st.tag ? `<span class="tag">${esc(st.tag)}</span>` : ""].join("");
+      html += `<div class="cell col-${l}"><div class="step${st.kind === "branch" ? " branch" : ""}" data-lane="${l}" data-i="${i}">
+        <span class="who">${esc(LANES[l].label)}</span>
+        <h3>${esc(st.title)}</h3>
+        <span class="screen">${esc(st.screen)}　<code>${esc(st.url)}</code></span>
+        ${st.note ? `<p class="note">${esc(st.note)}</p>` : ""}
+        ${tags}
+      </div></div>`;
+    });
+  });
+  html += `</div><svg class="wires" aria-hidden="true"></svg>`;
+  flowEl.innerHTML = html;
+  notesEl.innerHTML = `<h3>補足</h3><ul>${s.notes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
+  requestAnimationFrame(drawWires);
+}
+
+// 手順どうしを線でつなぐ。分岐は直前の主な手順から点線で出し、次の主な手順は分岐より前の主な手順からつなぐ
+function drawWires() {
+  const svg = flowEl.querySelector("svg.wires");
+  if (!svg || getComputedStyle(svg).display === "none") return;
+  const box = flowEl.getBoundingClientRect();
+  const steps = [...flowEl.querySelectorAll(".step")];
+  const rect = (el) => { const r = el.getBoundingClientRect(); return { x: r.left - box.left + r.width / 2, top: r.top - box.top, bottom: r.bottom - box.top }; };
+  const s = SCENES[current];
+  let out = "";
+  let lastMain = null;
+  s.steps.forEach((st, i) => {
+    const el = steps[i];
+    if (lastMain !== null) {
+      const a = rect(steps[lastMain]), b = rect(el);
+      const midY = b.top - 12;
+      const d = Math.abs(a.x - b.x) < 2 ? `M${a.x},${a.bottom} L${b.x},${b.top - 6}` : `M${a.x},${a.bottom} L${a.x},${midY} L${b.x},${midY} L${b.x},${b.top - 6}`;
+      out += `<path d="${d}" class="${st.kind === "branch" ? "dashed" : ""}"></path><polygon points="${b.x - 4.5},${b.top - 7} ${b.x + 4.5},${b.top - 7} ${b.x},${b.top - 1}"></polygon>`;
+    }
+    if (st.kind !== "branch") lastMain = i;
+  });
+  svg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+  svg.innerHTML = out;
+}
+
+tabsEl.addEventListener("click", (e) => {
+  const b = e.target.closest(".tab");
+  if (!b) return;
+  current = Number(b.dataset.i);
+  try { localStorage.setItem("flow-scene", String(current)); } catch (_) {}
+  renderTabs();
+  renderScene();
+});
+tabsEl.addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  current = (current + (e.key === "ArrowRight" ? 1 : SCENES.length - 1)) % SCENES.length;
+  renderTabs(); renderScene();
+  tabsEl.querySelector(`[data-i="${current}"]`).focus();
+});
+const fromHash = SCENES.findIndex((s) => "#" + s.id === location.hash);
+if (fromHash >= 0) current = fromHash;
+else { try { const v = Number(localStorage.getItem("flow-scene")); if (v >= 0 && v < SCENES.length) current = v; } catch (_) {} }
+renderTabs();
+renderScene();
+new ResizeObserver(() => drawWires()).observe(flowEl);
+if (document.fonts) document.fonts.ready.then(drawWires);
+</script>
