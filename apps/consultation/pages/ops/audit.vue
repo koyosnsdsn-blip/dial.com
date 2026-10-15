@@ -18,6 +18,7 @@ type Item = {
 // 操作種別の表示名。重点監視対象（要件 7.16）は important を付ける
 const ACTIONS: Record<string, { label: string; important?: boolean }> = {
   "case.list": { label: "案件一覧の閲覧" },
+  "case.test_ids": { label: "テスト案件のIDの取得（通知音の判定）" },
   "case.view": { label: "案件（相談内容）の閲覧", important: true },
   "message.send": { label: "返信の送信" },
   "case.urgent.set": { label: "緊急フラグの設定", important: true },

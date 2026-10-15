@@ -355,7 +355,7 @@ onMounted(load);
 
         <ClientAdminsPanel :client-id="detail.clientId" :closed="closed" />
         <ClientIpAllowlistPanel :client-id="detail.clientId" :contract-type="detail.contractType" />
-        <ClientReportsPanel :client-id="detail.clientId" :contract-type="detail.contractType" :prep="detail.status === 'prep'" />
+        <ClientReportsPanel :client-id="detail.clientId" :contract-type="detail.contractType" :prep="detail.status === 'prep'" :is-test="detail.isTest" />
 
         <section v-if="!closed" class="panel danger">
           <h2>契約を終了する</h2>

@@ -133,12 +133,14 @@ async function load() {
     const next = await $fetch<CaseRow[]>("/api/ops/cases", { query });
     // 前回の一覧では緊急でなかった案件が緊急になった場合、目立たせる
     const before = new Map(cases.value.map((c) => [c.caseId, c.urgent]));
+    // テスト案件は、タブの点滅と通知音の対象にしない（「テストのみ」を表示している間は対象にする）
+    const alertable = (c: CaseRow) => !c.isTest || testMode.value === "only";
     const becameUrgent = next.filter((c) => c.urgent && before.has(c.caseId) && !before.get(c.caseId));
     for (const c of becameUrgent) newlyUrgent.value.add(c.caseId);
-    if (becameUrgent.length > 0) alertUrgent();
+    if (becameUrgent.some(alertable)) alertUrgent();
     // 通知音用に各案件の緊急状態を覚える。Realtime の合図で先に鳴っていれば、ここでは重ねて鳴らさない
     let urgentSound = false;
-    for (const c of next) if (noteUrgent(c.caseId, c.urgent)) urgentSound = true;
+    for (const c of next) if (noteUrgent(c.caseId, c.urgent) && alertable(c)) urgentSound = true;
     if (urgentSound) playNotifySound("urgent");
     cases.value = next;
     errorMessage.value = "";

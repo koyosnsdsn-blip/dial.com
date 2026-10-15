@@ -17,9 +17,19 @@ export function useCaseRealtime(onChange: (kind: "case" | "message", caseId: str
   const supabase = authClient("ops");
   const status = ref<RealtimeStatus>("connecting");
   const testMode = useTestFilter();
+  // テスト案件の案件ID。テストの案件では通知音を鳴らさない（事前に知らされていない相談員が、テストの音に反応しないように）。
+  // ただし「テストのみ」を表示している間は、テストを確かめている最中なので鳴らす
+  const testCases = new Set<string>();
+  const muted = (caseId: string | null | undefined) => Boolean(caseId) && testCases.has(caseId as string) && testMode.value !== "only";
   let channel: RealtimeChannel | null = null;
 
   onMounted(async () => {
+    // 先にテスト案件のIDを読み込む。読めなかったときは、テストの区別なく従来どおり鳴らす
+    try {
+      for (const id of await $fetch<string[]>("/api/ops/test-case-ids")) testCases.add(id);
+    } catch {
+      /* 通知音の判定だけに使うため、失敗しても続ける */
+    }
     // Realtime の接続に、MFA 通過後（aal2）のアクセストークンを明示的に渡す
     const { data } = await supabase.auth.getSession();
     if (data.session) {
@@ -30,18 +40,22 @@ export function useCaseRealtime(onChange: (kind: "case" | "message", caseId: str
       .channel("staff-cases")
       .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, (payload: any) => {
         // 通知音（運営画面の「通知音」が ON のときだけ鳴る）。行データは音の種類を決めるためだけに使い、画面には出さない
-        // テスト案件は、「テストを隠す」にしている間は鳴らさない（メッセージの合図には案件のテスト区分がないため、メッセージ音は対象外）
-        const muted = Boolean(payload.new?.is_test) && testMode.value === "hide";
+        // 案件のテスト区分を控える（新しい案件・区分が変わった案件）
+        if (payload.new?.case_id) {
+          if (payload.new.is_test) testCases.add(payload.new.case_id);
+          else testCases.delete(payload.new.case_id);
+        }
+        const silent = muted(payload.new?.case_id);
         if (payload.eventType === "INSERT") {
-          if (!muted) playNotifySound("case");
+          if (!silent) playNotifySound("case");
         } else if (payload.eventType === "UPDATE" && payload.new?.case_id && payload.new.status === "open") {
-          if (noteUrgent(payload.new.case_id, Boolean(payload.new.urgent_flag)) && !muted) playNotifySound("urgent");
+          if (noteUrgent(payload.new.case_id, Boolean(payload.new.urgent_flag)) && !silent) playNotifySound("urgent");
         }
         onChange("case", (payload.new?.case_id ?? payload.old?.case_id ?? null) as string | null);
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
         // 利用者からのメッセージだけ鳴らす（相談員自身の送信では鳴らさない）
-        if (payload.new?.sender === "user") playNotifySound("message");
+        if (payload.new?.sender === "user" && !muted(payload.new?.case_id)) playNotifySound("message");
         onChange("message", (payload.new?.case_id ?? null) as string | null);
       })
       .subscribe((s) => {
