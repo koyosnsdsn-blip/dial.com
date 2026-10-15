@@ -10,7 +10,7 @@ max_rows = 1000
 
 [db]
 port = 54322
-major_version = 15
+major_version = 17  # dev（Supabase クラウド）は PostgreSQL 17。ローカルもそろえる
 
 [studio]
 enabled = true
@@ -25,3 +25,29 @@ enable_signup = true
 
 [realtime]
 enabled = true
+
+# メール文面（日本語）。クラウドの Supabase には自動では反映されない。ダッシュボードの Authentication → Emails → Templates に貼り付ける（docs/メール文面_Supabase認証.md）
+[auth.email.template.confirmation]
+subject = "【ダイヤル.com】メールアドレスの確認"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "【ダイヤル.com】パスワードの再設定"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.invite]
+subject = "【ダイヤル.com】アカウント登録のご案内"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.magic_link]
+subject = "【ダイヤル.com】ログイン用のリンク"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "【ダイヤル.com】メールアドレス変更の確認"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.reauthentication]
+subject = "【ダイヤル.com】確認コード"
+content_path = "./supabase/templates/reauthentication.html"
+

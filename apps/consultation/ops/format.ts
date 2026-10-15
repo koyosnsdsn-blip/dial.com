@@ -80,6 +80,8 @@ export function apiErrorMessage(e: any): string {
     invalid_counselor: "選択した相談員は現在有効ではありません。",
     invalid_email: "メールアドレスの形式が正しくありません。",
     already_exists: "このメールアドレスは、この役割ではすでに登録されています（相談員・クライアント管理者・相談者は別々のアカウントのため、他の役割で登録済みでも、ここでは重複になりません）。",
+    no_contact_email: "連絡先のメールアドレスが登録されていないため、メールを送れません。",
+    mail_not_configured: "メール送信の設定が完了していません。",
     expired_account: "失効しているアカウントには発行できません。先に再び有効にしてください。",
     email_failed: "招待メールを送信できませんでした。開発環境では、Supabase の組織メンバーのアドレスにしか送信できません。",
     cannot_change_self: "自分自身の権限・状態は変更できません。",
@@ -171,4 +173,11 @@ export function apiErrorMessage(e: any): string {
 export function quarterLabel(start: string): string {
   const [y, m] = start.split("-").map(Number);
   return `${y}年${m}〜${m + 2}月`;
+}
+
+// 招待・再設定のメールを送った結果の案内文。リンクは画面に出さない（メールで本人に届く）
+export function setupMailMessage(res: { mailSent: boolean; to: string }, name: string, action: "登録" | "再送"): string {
+  return res.mailSent
+    ? `${name} さんを${action === "登録" ? "登録し、設定用のメールを送りました" : "宛先にパスワード設定用のメールを送りました"}（宛先：${res.to}）。本人がメールのリンクからパスワードと2段階認証を設定すると利用できます。`
+    : `${action === "登録" ? `${name} さんを登録しましたが、` : ""}メールを送れませんでした（宛先：${res.to}）。しばらくしてから「メールを再送」を試してください。続く場合はメール送信の設定を確認してください。`;
 }

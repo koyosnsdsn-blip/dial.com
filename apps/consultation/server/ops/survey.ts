@@ -26,30 +26,41 @@ export function parseSurveyInput(body: Record<string, unknown> | null | undefine
   return { text, kind: body.kind, aggregatable: body?.aggregatable === true, options };
 }
 
+// 設問と選択肢を、DBの関数で1回のトランザクションとして作る（途中で失敗して選択肢のない設問が残らないように）
 export async function insertQuestion(event: H3Event, clientId: string, input: SurveyInput, sortOrder: number): Promise<string> {
-  const db = serviceDb(event);
-  const { data, error } = await db
-    .from("survey_questions")
-    .insert({ client_id: clientId, kind: input.kind, question_text: input.text, sort_order: sortOrder, aggregatable: input.aggregatable, active: true })
-    .select("survey_question_id")
-    .single();
-  if (error) {
-    if ((error.message ?? "").includes("already has 2 active")) throw createError({ statusCode: 409, statusMessage: "survey_limit" });
-    console.error("[survey] insert failed", error.code);
-    throw createError({ statusCode: 500, statusMessage: "update_failed" });
-  }
-  const questionId = data.survey_question_id as string;
-  await insertOptions(event, questionId, input.options);
-  return questionId;
+  const { data, error } = await serviceDb(event).rpc("survey_create_question", {
+    p_client: clientId,
+    p_kind: input.kind,
+    p_text: input.text,
+    p_sort: sortOrder,
+    p_aggregatable: input.aggregatable,
+    p_options: input.options,
+    p_decline: DECLINE_LABEL,
+  });
+  if (error) throw surveyWriteError(error);
+  return data as string;
 }
 
-export async function insertOptions(event: H3Event, questionId: string, options: string[]): Promise<void> {
-  const rows = [
-    ...options.map((label, i) => ({ survey_question_id: questionId, label, sort_order: (i + 1) * 10 })),
-    { survey_question_id: questionId, label: DECLINE_LABEL, sort_order: 990 },
-  ];
-  const { error } = await serviceDb(event).from("survey_options").insert(rows);
-  if (error) throw createError({ statusCode: 500, statusMessage: "update_failed" });
+// 設問を取り下げて、新しい設問として作り直す（1回のトランザクション。どちらかが失敗すれば取り下げも取り消される）
+export async function replaceQuestion(event: H3Event, oldId: string, clientId: string, input: SurveyInput, sortOrder: number): Promise<string> {
+  const { data, error } = await serviceDb(event).rpc("survey_replace_question", {
+    p_old: oldId,
+    p_client: clientId,
+    p_kind: input.kind,
+    p_text: input.text,
+    p_sort: sortOrder,
+    p_aggregatable: input.aggregatable,
+    p_options: input.options,
+    p_decline: DECLINE_LABEL,
+  });
+  if (error) throw surveyWriteError(error);
+  return data as string;
+}
+
+function surveyWriteError(error: { message?: string; code?: string }) {
+  if ((error.message ?? "").includes("already has 2 active")) return createError({ statusCode: 409, statusMessage: "survey_limit" });
+  console.error("[survey] write failed", error.code);
+  return createError({ statusCode: 500, statusMessage: "update_failed" });
 }
 
 // 設問に回答が1件でもあるか（属性の回答、または案件に複写された回答）

@@ -1,0 +1,29 @@
+# 型チェックとビルドを、main への push と pull request のたびに実行する（点検 2026-10-15 の 2-13）。
+# SQL の試験（supabase/tests）は、Supabase 固有のスキーマ（auth など）が要るため、ここでは実行しない。dev で手動実行する（docs/開発環境一覧.md）。
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm --filter consultation build
+        env:
+          # ビルドに必要な公開値。本物の値でなくてよい（ビルド成果物は使わない）
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_ANON_KEY: ci-dummy-anon-key

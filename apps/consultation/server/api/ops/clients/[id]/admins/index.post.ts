@@ -4,7 +4,7 @@ import { writeAudit } from "../../../../../ops/audit";
 import { requireStaff } from "../../../../../ops/auth";
 import { requireText } from "../../../../../ops/cases";
 import { serviceDb } from "../../../../../ops/db";
-import { SETUP_LINK_NOTE } from "../../../../../ops/setupLink";
+import { maskEmail } from "../../../../../ops/mail";
 import { inviteClientAdmin, requireEmail } from "../../../../../ops/portal";
 import { requireUuid } from "../../../../../utils/validate";
 export default defineEventHandler(async (event) => {
@@ -22,6 +22,6 @@ export default defineEventHandler(async (event) => {
 
   // メールアドレスは監査ログに残さない
   await writeAudit(event, staff, { action: "client.admin.invite", targetType: "client_admins", targetId: clientId, reason });
-  const { adminId, link } = await inviteClientAdmin(event, clientId, email, name);
-  return { adminId, link, note: SETUP_LINK_NOTE };
+  const { adminId, mailSent } = await inviteClientAdmin(event, clientId, email, name);
+  return { adminId, mailSent, to: maskEmail(email) };
 });

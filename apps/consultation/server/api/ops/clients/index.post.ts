@@ -4,7 +4,7 @@
 // - 登録直後は「準備中」。招待コードは自動発行するが、「有効」に切り替えるまで機能しない（7.10.9）
 // - ラリー回数・返信SLAは既定値（往復1回・24時間）。登録後に設定画面で変更する
 //   【仮】要件 7.10.8 は初期値を「往復5回」と記載しているが、3.2.5・7.10.3 の「企業枠の既定は1回」を採った
-// 未実装：初回のクライアント管理者アカウントの発行（クライアント管理サイトが未実装のため）
+// 初回のクライアント管理者の招待は、登録後に ClientAdminsPanel（/api/ops/clients/[id]/admins）から行う
 import { writeAudit } from "../../../ops/audit";
 import { requireStaff } from "../../../ops/auth";
 import { requireText } from "../../../ops/cases";

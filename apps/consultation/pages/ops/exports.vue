@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // データ出力（CSV。要件 7.9）。社内業務用の4種類。
 // 出力できる範囲：運営管理者は全案件、相談員は自分の担当案件のみ。出力の操作は監査ログに記録される。
-// 未実装：クライアント提出用（7.9.6。四半期レポートが未実装）
+// 未実装：クライアント提出用の出力（7.9.6。四半期レポート自体は client_quarterly_reports に生成され、クライアント管理サイトで見られる）
 import { apiErrorMessage } from "../../ops/format";
 import type { TestMode } from "../../ops/testFilter";
 const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);

@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
   const db = serviceDb(event);
 
   // 接続元ごとの回数制限。IPアドレスそのものは保存せず、日付を混ぜたハッシュの一部だけを記録する（日をまたぐと照合できない）
-  const ip = getRequestIP(event, { xForwardedFor: true }) ?? "unknown";
+  const ip = requestIp(event) ?? "unknown";
   const day = new Date().toISOString().slice(0, 10);
   const source = `src:${createHash("sha256").update(`${ip}|${day}`).digest("hex").slice(0, 16)}`;
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();

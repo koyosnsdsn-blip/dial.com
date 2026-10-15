@@ -10,7 +10,8 @@ import { STAFF_SESSION_SECONDS, lastAuthAt } from "../../ops/session";
 import { serviceDb } from "./db";
 import { areaClaims, areaSupabaseClient } from "./session";
 import { loginIdToEmail, roleOfLoginEmail } from "./nickname";
-import { createInviteLink, createResetLink } from "./setupLink";
+import { maskEmail } from "./mail";
+import { createInviteToken, createResetToken, sendSetupMail } from "./setupMail";
 import { clientAdminIpAllowed } from "../utils/ipGuard";
 
 export type ClientAdminContext = { userId: string; clientId: string; name: string };
@@ -82,30 +83,37 @@ export function requireEmail(value: unknown): string {
   return email;
 }
 
-// クライアント管理者を招待する（パスワード設定用のリンク → /ops/accept-invite でパスワード設定 → 2段階認証の登録）。
-// 【暫定】メールは送らず、リンクを呼び出し側へ返して画面に表示する（server/ops/setupLink.ts）。
+// クライアント管理者を招待する（招待のメール → /ops/accept-invite でパスワード設定 → 2段階認証の登録）。
+// メールは本人のアドレスへ送る（server/ops/setupMail.ts）。送れなかったときもアカウントは作成済みで、再送で届け直せる。
 // Auth には、メールアドレスから作った内部用の識別子（c-…）で登録する。本物のメールアドレスは client_admins.email に持つ。
 // 役割ごとに識別子が違うので、同じメールアドレスの相談者・相談員がいても重複にならない（同じ役割で二重に登録しようとしたときだけ already_exists）。
 // 呼び出し側で、権限の確認と監査ログの記録を先に済ませること。
-export async function inviteClientAdmin(event: H3Event, clientId: string, email: string, name: string): Promise<{ adminId: string; link: string }> {
+export async function inviteClientAdmin(event: H3Event, clientId: string, email: string, name: string): Promise<{ adminId: string; mailSent: boolean }> {
   const db = serviceDb(event);
   const loginEmail = loginIdToEmail("client_admin", email, useRuntimeConfig(event).public.nicknameDomain as string);
-  const { userId, link } = await createInviteLink(event, loginEmail, "client_admin.invite");
+  const { userId, tokenHash } = await createInviteToken(event, loginEmail, "client_admin.invite");
   const { error: insertError } = await db.from("client_admins").insert({ admin_id: userId, client_id: clientId, name, email, status: "active" });
   if (insertError) {
     console.error("[client_admin.invite] insert failed", insertError.code);
+    // 管理者として使えない Auth ユーザーを残さない（残すと、同じアドレスで再招待できなくなる）
+    await db.auth.admin.deleteUser(userId).catch(() => {});
     throw createError({ statusCode: 500, statusMessage: "update_failed" });
   }
-  return { adminId: userId, link };
+  const mailSent = await sendSetupMail(event, { kind: "invite", to: email, name, roleLabel: "クライアント管理者", area: "client", tokenHash, tag: "client_admin.invite" });
+  return { adminId: userId, mailSent };
 }
 
-// クライアント管理者に、パスワードを設定し直すリンクを作る。対象が指定のクライアントの有効な管理者であることを確かめる
-export async function clientAdminResetLink(event: H3Event, clientId: string, adminId: string): Promise<string> {
-  const { data, error } = await serviceDb(event).from("client_admins").select("admin_id, status").eq("admin_id", adminId).eq("client_id", clientId).maybeSingle();
+// クライアント管理者に、パスワード再設定のメールを再送する。対象が指定のクライアントの有効な管理者であることを確かめる。
+// 宛先は対象の管理者自身のアドレス（操作した人には届かない）
+export async function clientAdminResend(event: H3Event, clientId: string, adminId: string): Promise<{ mailSent: boolean; to: string }> {
+  const { data, error } = await serviceDb(event).from("client_admins").select("admin_id, name, email, status").eq("admin_id", adminId).eq("client_id", clientId).maybeSingle();
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
   if (!data) throw createError({ statusCode: 404, statusMessage: "not_found" });
   if (data.status !== "active") throw createError({ statusCode: 409, statusMessage: "expired_account" });
-  return createResetLink(event, adminId, "client_admin.reset");
+  if (!data.email) throw createError({ statusCode: 409, statusMessage: "no_contact_email" });
+  const tokenHash = await createResetToken(event, adminId, "client_admin.resend");
+  const mailSent = await sendSetupMail(event, { kind: "reset", to: data.email, name: data.name, roleLabel: "クライアント管理者", area: "client", tokenHash, tag: "client_admin.resend" });
+  return { mailSent, to: maskEmail(data.email) };
 }
 
 // クライアント管理者の失効・再有効化。有効な管理者が1人もいなくなる変更は、DBのトリガが拒否する。

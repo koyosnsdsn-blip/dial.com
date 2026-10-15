@@ -1,5 +1,7 @@
 <script setup lang="ts">
-// 招待・再設定のリンクから開く画面（【暫定】いまはリンクを運営画面に表示して本人に手渡ししている。server/ops/setupLink.ts）：パスワードを設定し、2段階認証の登録（/mfa）へ進む。
+// 招待・再設定のメールのリンクから開く画面（メールは server/ops/setupMail.ts が送る）：パスワードを設定し、2段階認証の登録（/mfa）へ進む。
+// メールのリンクは ?token_hash=…&type=invite|recovery&area=ops|client の形。開いただけではトークンを使わず、「進む」ボタンを押したときに確認する
+// （メールの先読みで、本人より先にトークンが使われるのを避けるため）。
 // 招待されたアカウントの役割（相談員・運営管理者／クライアント管理者）は、ログインID（Auth 上のメールアドレス）の接頭辞で分かる。
 // 設定が済んだら、役割に応じたMFA画面（/ops/mfa または /client-admin/mfa）へ進む。
 // Supabase の招待リンクは、認証後に URL のハッシュ（#access_token=...&type=invite）でセッションを渡してくる。
@@ -13,7 +15,9 @@ import { authClient } from "../../ops/authClient";
 let supabase: SupabaseClient = authClient("ops");
 const nicknameDomain = useRuntimeConfig().public.nicknameDomain as string;
 
-type Mode = "loading" | "form" | "invalid";
+type Mode = "loading" | "confirm" | "form" | "invalid";
+// メールのリンクに付いた、確認前のトークン
+let pending: { tokenHash: string; type: "invite" | "recovery"; area: "ops" | "client" } | null = null;
 const mode = ref<Mode>("loading");
 const password = ref("");
 const password2 = ref("");
@@ -25,9 +29,19 @@ onMounted(async () => {
   const accessToken = hash.get("access_token");
   const refreshToken = hash.get("refresh_token");
   const linkError = hash.get("error_description");
+  const query = new URLSearchParams(window.location.search);
+  const tokenHash = query.get("token_hash");
+  const linkType = query.get("type");
 
   // トークンをアドレスバーや履歴に残さない
-  if (window.location.hash) history.replaceState(null, "", window.location.pathname);
+  if (window.location.hash || window.location.search) history.replaceState(null, "", window.location.pathname);
+
+  // メールのリンク：ボタンが押されるまでトークンを使わない
+  if (tokenHash && (linkType === "invite" || linkType === "recovery")) {
+    pending = { tokenHash, type: linkType, area: query.get("area") === "client" ? "client" : "ops" };
+    mode.value = "confirm";
+    return;
+  }
 
   if (linkError) {
     mode.value = "invalid";
@@ -53,6 +67,17 @@ onMounted(async () => {
   }
   mode.value = data.session ? "form" : "invalid";
 });
+
+// 「パスワードの設定に進む」：メールのトークンを確認してセッションを作る
+async function proceed() {
+  if (!pending) return;
+  busy.value = true;
+  supabase = authClient(pending.area);
+  const { error } = await supabase.auth.verifyOtp({ token_hash: pending.tokenHash, type: pending.type });
+  busy.value = false;
+  pending = null;
+  mode.value = error ? "invalid" : "form";
+}
 
 // アクセストークン（JWT）の中のメールアドレスから、領域を決める。読めなければ運営画面側
 function areaOfToken(token: string): "ops" | "client" {
@@ -82,7 +107,7 @@ async function submit() {
     errorMessage.value =
       error.code === "weak_password"
         ? "このパスワードは使えません。別のパスワードにしてください。"
-        : "パスワードを設定できませんでした。リンクの期限が切れている可能性があります。発行した人に、リンクの再発行を依頼してください。";
+        : "パスワードを設定できませんでした。リンクの期限が切れている可能性があります。運営管理者（または所属先の管理者）に、メールの再送を依頼してください。";
     return;
   }
   password.value = "";
@@ -98,9 +123,13 @@ async function submit() {
     <main class="card">
       <h1>パスワードの設定</h1>
       <p v-if="mode === 'loading'" class="note">確認しています…</p>
+      <template v-else-if="mode === 'confirm'">
+        <p class="note">ダイヤル.com へようこそ。次の画面で、ログインに使うパスワードを設定します。続けて2段階認証（認証アプリ）を登録します。</p>
+        <button type="button" :disabled="busy" @click="proceed">{{ busy ? "確認中…" : "パスワードの設定に進む" }}</button>
+      </template>
       <template v-else-if="mode === 'invalid'">
-        <p class="error">招待リンクが無効か、有効期限が切れています。</p>
-        <p class="note">リンクは1回だけ使えて、期限は発行から1時間です。発行した人（運営管理者、またはクライアントの管理者）に、リンクの再発行を依頼してください。</p>
+        <p class="error">メールのリンクが無効か、有効期限が切れています。</p>
+        <p class="note">リンクは1回だけ使えます。運営管理者（クライアント管理者の方は、所属先の管理者または運営）に、メールの再送を依頼してください。</p>
       </template>
       <form v-else @submit.prevent="submit">
         <p class="note">ダイヤル.com へようこそ。ログインに使うパスワードを設定してください。続けて2段階認証（認証アプリ）を登録します。</p>

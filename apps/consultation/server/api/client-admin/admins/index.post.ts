@@ -2,7 +2,7 @@
 // 追加先は、必ずログイン中の管理者自身のクライアント（リクエストからクライアントIDを受け取らない）。
 import { requireText } from "../../../ops/cases";
 import { serviceDb } from "../../../ops/db";
-import { SETUP_LINK_NOTE } from "../../../ops/setupLink";
+import { maskEmail } from "../../../ops/mail";
 import { inviteClientAdmin, requireClientAdmin, requireEmail, writePortalAudit } from "../../../ops/portal";
 export default defineEventHandler(async (event) => {
   const admin = await requireClientAdmin(event);
@@ -14,6 +14,6 @@ export default defineEventHandler(async (event) => {
   if (!client || client.status === "closed") throw createError({ statusCode: 409, statusMessage: "client_closed" });
 
   await writePortalAudit(event, admin, { action: "portal.admin.invite", targetType: "client_admins", targetId: admin.clientId });
-  const { adminId, link } = await inviteClientAdmin(event, admin.clientId, email, name);
-  return { adminId, link, note: SETUP_LINK_NOTE };
+  const { adminId, mailSent } = await inviteClientAdmin(event, admin.clientId, email, name);
+  return { adminId, mailSent, to: maskEmail(email) };
 });

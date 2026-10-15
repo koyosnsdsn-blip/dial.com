@@ -15,11 +15,13 @@
     "@nuxtjs/supabase": "^2.0.10",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.45.0",
+    "nodemailer": "^10.1.1",
     "nuxt": "^3.13.0",
     "vue": "^3.5.0"
   },
   "devDependencies": {
     "@types/node": "22",
+    "@types/nodemailer": "^8.0.2",
     "typescript": "^5.5.0",
     "vue-tsc": "^3.3.11"
   }

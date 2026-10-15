@@ -5,7 +5,7 @@
 // 見せるもの：登録件数と四半期レポート（開示用に加工済み）、従業員への案内用の招待コード、管理者アカウントの管理。
 // 見せないもの：相談の内容、誰が相談したか、期間の途中の数値。これらは API にも DB の権限にも経路がない。
 import type { ReportRow } from "~/components/ReportTable.vue";
-import { apiErrorMessage, formatDateTime } from "../../ops/format";
+import { apiErrorMessage, formatDateTime, setupMailMessage } from "../../ops/format";
 import { signOut, usePortalAdmin } from "../../ops/useStaff";
 
 type Admin = { adminId: string; name: string; email: string | null; status: "active" | "expired"; lastLoginAt: string | null; isSelf: boolean };
@@ -46,22 +46,19 @@ async function run(fn: () => Promise<string>) {
     busy.value = false;
   }
 }
-// 【暫定】パスワード設定用のリンク（メールを送る仕組みが入るまで、メールの代わりに画面へ表示する）
-const setupLink = ref<{ name: string; link: string; note: string } | null>(null);
 function invite() {
   return run(async () => {
-    const res = await $fetch<{ link: string; note: string }>("/api/client-admin/admins", { method: "POST", body: { ...form } });
-    setupLink.value = { name: form.name.trim(), link: res.link, note: res.note };
+    const res = await $fetch<{ mailSent: boolean; to: string }>("/api/client-admin/admins", { method: "POST", body: { ...form } });
+    const text = setupMailMessage(res, form.name.trim(), "登録");
     Object.assign(form, { name: "", email: "" });
-    return "追加しました。下のリンクを本人に渡してください。";
+    return text;
   });
 }
 function reissue(a: Admin) {
-  if (!window.confirm(`${a.name} さんのパスワード設定用のリンクを発行します（招待のリンクの期限切れ・パスワード忘れ）。よろしいですか？`)) return;
+  if (!window.confirm(`${a.name} さんのパスワード設定用のメールを再送します（招待の期限切れ・パスワード忘れ）。宛先は ${a.name} さん本人のメールアドレスです。よろしいですか？`)) return;
   return run(async () => {
-    const res = await $fetch<{ link: string; note: string }>(`/api/client-admin/admins/${a.adminId}/link`, { method: "POST" });
-    setupLink.value = { name: a.name, link: res.link, note: res.note };
-    return "リンクを発行しました。下のリンクを本人に渡してください。";
+    const res = await $fetch<{ mailSent: boolean; to: string }>(`/api/client-admin/admins/${a.adminId}/resend`, { method: "POST" });
+    return setupMailMessage(res, a.name, "再送");
   });
 }
 function remove(a: Admin) {
@@ -117,7 +114,6 @@ onMounted(load);
 
       <section class="panel">
         <h2>管理者アカウント</h2>
-        <SetupLinkBox v-if="setupLink" :name="setupLink.name" :link="setupLink.link" :note="setupLink.note" @close="setupLink = null" />
         <table v-if="admins.length">
           <thead><tr><th>氏名</th><th>メールアドレス</th><th>状態</th><th>最終利用</th><th></th></tr></thead>
           <tbody>
@@ -127,7 +123,7 @@ onMounted(load);
               <td>{{ a.status === "active" ? "有効" : "削除済み" }}</td>
               <td>{{ a.lastLoginAt ? formatDateTime(a.lastLoginAt) : "未利用" }}</td>
               <td>
-                <button v-if="a.status === 'active' && !a.isSelf" class="secondary small" type="button" :disabled="busy" @click="reissue(a)">リンク再発行</button>
+                <button v-if="a.status === 'active' && !a.isSelf" class="secondary small" type="button" :disabled="busy" @click="reissue(a)">メールを再送</button>
                 <button v-if="a.status === 'active' && !a.isSelf" class="secondary small" type="button" :disabled="busy || activeAdmins.length <= 1" @click="remove(a)">削除</button>
               </td>
             </tr>
@@ -139,8 +135,8 @@ onMounted(load);
             <label>氏名<input v-model="form.name" maxlength="100" autocomplete="off" /></label>
             <label>メールアドレス<input v-model="form.email" type="email" maxlength="254" autocomplete="off" /></label>
           </div>
-          <button type="button" :disabled="busy || form.name.trim() === '' || form.email.trim() === ''" @click="invite">追加して設定用のリンクを発行</button>
-          <p class="note">追加すると、パスワード設定用のリンクが表示されます。本人に直接渡してください。本人がリンクからパスワードと2段階認証を設定すると、このサイトを使えるようになります。ご自身のアカウントは削除できません。</p>
+          <button type="button" :disabled="busy || form.name.trim() === '' || form.email.trim() === ''" @click="invite">追加して招待メールを送る</button>
+          <p class="note">追加すると、入力したメールアドレスへ招待のメールが届きます。本人がメールのリンクからパスワードと2段階認証を設定すると、このサイトを使えるようになります。ご自身のアカウントは削除できません。</p>
         </template>
       </section>
     </main>

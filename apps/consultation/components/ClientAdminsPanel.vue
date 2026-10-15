@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 契約クライアントの設定画面：クライアント管理者アカウント（要件 7.10.6）。運営管理者のみ。
-// 登録するとパスワード設定用のリンクを表示する（【暫定】メール送信の仕組みが入るまで）。本人がパスワードと2段階認証を設定すると、クライアント管理サイトを使えるようになる。
-import { apiErrorMessage, formatDateTime } from "../ops/format";
+// 登録すると、本人のアドレスへ招待のメールを送る。本人がメールのリンクからパスワードと2段階認証を設定すると、クライアント管理サイトを使えるようになる。
+import { apiErrorMessage, formatDateTime, setupMailMessage } from "../ops/format";
 type Admin = { adminId: string; name: string; email: string | null; status: "active" | "expired"; lastLoginAt: string | null };
 
 const props = defineProps<{ clientId: string; closed: boolean }>();
@@ -11,8 +11,6 @@ const busy = ref(false);
 const form = reactive({ name: "", email: "", reason: "" });
 const message = ref("");
 const errorMessage = ref("");
-// 【暫定】パスワード設定用のリンク（メールの代わりに画面へ表示する）
-const setupLink = ref<{ name: string; link: string; note: string } | null>(null);
 
 async function load() {
   try {
@@ -39,10 +37,10 @@ async function run(fn: () => Promise<string>) {
 }
 function invite() {
   return run(async () => {
-    const res = await $fetch<{ link: string; note: string }>(`/api/ops/clients/${props.clientId}/admins`, { method: "POST", body: { ...form } });
-    setupLink.value = { name: form.name.trim(), link: res.link, note: res.note };
+    const res = await $fetch<{ mailSent: boolean; to: string }>(`/api/ops/clients/${props.clientId}/admins`, { method: "POST", body: { ...form } });
+    const text = setupMailMessage(res, form.name.trim(), "登録");
     Object.assign(form, { name: "", email: "", reason: "" });
-    return "登録しました。下のリンクを本人に渡してください。";
+    return text;
   });
 }
 function change(a: Admin, status: "active" | "expired") {
@@ -54,12 +52,11 @@ function change(a: Admin, status: "active" | "expired") {
   });
 }
 function reissue(a: Admin) {
-  const reason = window.prompt(`${a.name} さんのパスワード設定用のリンクを発行します（招待のリンクの期限切れ・パスワード忘れ）。理由を入力してください。`);
+  const reason = window.prompt(`${a.name} さんのパスワード設定用のメールを再送します（招待の期限切れ・パスワード忘れ）。理由を入力してください。`);
   if (!reason || reason.trim() === "") return;
   return run(async () => {
-    const res = await $fetch<{ link: string; note: string }>(`/api/ops/clients/${props.clientId}/admins/${a.adminId}/link`, { method: "POST", body: { reason } });
-    setupLink.value = { name: a.name, link: res.link, note: res.note };
-    return "リンクを発行しました。下のリンクを本人に渡してください。";
+    const res = await $fetch<{ mailSent: boolean; to: string }>(`/api/ops/clients/${props.clientId}/admins/${a.adminId}/resend`, { method: "POST", body: { reason } });
+    return setupMailMessage(res, a.name, "再送");
   });
 }
 onMounted(load);
@@ -74,7 +71,6 @@ onMounted(load);
     </p>
     <p v-if="message" class="ok" role="status">{{ message }}</p>
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
-    <SetupLinkBox v-if="setupLink" :name="setupLink.name" :link="setupLink.link" :note="setupLink.note" @close="setupLink = null" />
     <p v-if="loading" class="note">読み込み中…</p>
     <table v-else-if="rows.length">
       <thead><tr><th>氏名</th><th>メールアドレス</th><th>状態</th><th>最終利用</th><th></th></tr></thead>
@@ -85,7 +81,7 @@ onMounted(load);
           <td>{{ a.status === "active" ? "有効" : "失効" }}</td>
           <td>{{ a.lastLoginAt ? formatDateTime(a.lastLoginAt) : "未利用" }}</td>
           <td>
-            <button v-if="a.status === 'active'" class="secondary small" type="button" :disabled="busy" @click="reissue(a)">リンク再発行</button>
+            <button v-if="a.status === 'active'" class="secondary small" type="button" :disabled="busy" @click="reissue(a)">メールを再送</button>
             <button v-if="a.status === 'active'" class="secondary small" type="button" :disabled="busy" @click="change(a, 'expired')">失効</button>
             <button v-else-if="!closed" class="secondary small" type="button" :disabled="busy" @click="change(a, 'active')">再有効化</button>
           </td>
@@ -102,7 +98,7 @@ onMounted(load);
       </div>
       <label :for="`admin-reason-${clientId}`">理由（必須）</label>
       <input :id="`admin-reason-${clientId}`" v-model="form.reason" maxlength="500" placeholder="例：契約開始に伴う初回発行" />
-      <button class="secondary" type="button" :disabled="busy || form.name.trim() === '' || form.email.trim() === '' || form.reason.trim() === ''" @click="invite">登録して設定用のリンクを発行</button>
+      <button class="secondary" type="button" :disabled="busy || form.name.trim() === '' || form.email.trim() === '' || form.reason.trim() === ''" @click="invite">登録して招待メールを送る</button>
       <p class="note">有効な管理者が1人だけのときは、その管理者を失効できません。先にもう1人を発行してください。</p>
     </template>
   </section>

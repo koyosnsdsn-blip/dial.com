@@ -4,6 +4,37 @@
 //   運営画面           … /ops/…（相談員・運営管理者。MFA必須）
 //   クライアント管理サイト … /client-admin/…（MFA必須）
 // 技術基盤設計書 1.2 の「アプリを分けて被害範囲を分離する」方針は、これにより変更になる（docs/未決事項一覧_統合版.md を参照）。
+// ===== セキュリティヘッダー（点検 2026-10-15 の対応。docs/実装残り・穴の点検_2026-10-15.md 2-2） =====
+// CSP は、まず Report-Only（違反を報告するだけで、止めない）で配信する。
+// Nuxt が出力する埋め込みスクリプトのため script-src に 'unsafe-inline' を許している。違反の報告（/api/csp-report）を一通り確かめてから、
+// 「Content-Security-Policy-Report-Only」を「Content-Security-Policy」に変えて強制に切り替える。
+// frame-src は動画の埋め込み（server/utils/videos.ts が許可するホスト）に合わせている。
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "media-src 'self' blob:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "frame-src https://player.vimeo.com https://www.youtube.com https://www.youtube-nocookie.com",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+  "report-uri /api/csp-report",
+].join("; ");
+const SECURITY_HEADERS = {
+  "Content-Security-Policy-Report-Only": CSP,
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "Strict-Transport-Security": "max-age=31536000",
+};
+// ログイン後の画面は、ブラウザの「戻る」で相談内容の画面が再表示されないように、キャッシュさせない（要件 10.4）
+const NO_STORE = { "Cache-Control": "no-store" };
+
 export default defineNuxtConfig({
   compatibilityDate: "2026-01-01",
   devtools: { enabled: true },
@@ -32,6 +63,7 @@ export default defineNuxtConfig({
   // 相談内容がサーバー生成のHTMLやそのキャッシュに混入する経路をなくすため（運営画面と同じ考え方）。
   // 公開ページ（トップ・緊急時の案内）だけサーバー側で生成する。緊急時の案内はJavaScriptが動かなくても読める
   routeRules: {
+    "/**": { headers: SECURITY_HEADERS },
     "/start/**": { ssr: false },
     "/login": { ssr: false },
     "/signup": { ssr: false },
@@ -40,10 +72,10 @@ export default defineNuxtConfig({
     "/update-password": { ssr: false },
     "/invite": { ssr: false },
     "/contact": { ssr: false },
-    "/consult/**": { ssr: false },
-    "/consult": { ssr: false },
-    "/mypage/**": { ssr: false },
-    "/mypage": { ssr: false },
+    "/consult/**": { ssr: false, headers: NO_STORE },
+    "/consult": { ssr: false, headers: NO_STORE },
+    "/mypage/**": { ssr: false, headers: NO_STORE },
+    "/mypage": { ssr: false, headers: NO_STORE },
     // 【仮】Q&A は公開ページだが、いまはブラウザ側で表示している。検索エンジン向けにサーバー側で生成するかは、公開時に見直す
     "/qa/**": { ssr: false },
     "/qa": { ssr: false },
@@ -52,10 +84,10 @@ export default defineNuxtConfig({
     "/c/**": { ssr: false, headers: { "X-Robots-Tag": "noindex, nofollow" } },
     // 運営画面・クライアント管理サイトは、全画面ログイン必須・検索エンジン対象外。サーバー側でHTMLを生成しない
     // （利用者の情報がサーバー生成のHTMLに混入する経路をなくし、認証の判定もブラウザ側の1か所に集約する）
-    "/ops": { ssr: false, headers: { "X-Robots-Tag": "noindex, nofollow" } },
-    "/ops/**": { ssr: false, headers: { "X-Robots-Tag": "noindex, nofollow" } },
-    "/client-admin": { ssr: false, headers: { "X-Robots-Tag": "noindex, nofollow" } },
-    "/client-admin/**": { ssr: false, headers: { "X-Robots-Tag": "noindex, nofollow" } },
+    "/ops": { ssr: false, headers: { "X-Robots-Tag": "noindex, nofollow", ...NO_STORE } },
+    "/ops/**": { ssr: false, headers: { "X-Robots-Tag": "noindex, nofollow", ...NO_STORE } },
+    "/client-admin": { ssr: false, headers: { "X-Robots-Tag": "noindex, nofollow", ...NO_STORE } },
+    "/client-admin/**": { ssr: false, headers: { "X-Robots-Tag": "noindex, nofollow", ...NO_STORE } },
   },
 
   runtimeConfig: {

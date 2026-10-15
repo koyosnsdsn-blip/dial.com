@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 契約クライアントの一覧と新規登録（要件 7.10.1・7.10.8）。運営管理者のみ。
-// 未実装：直近の実績利用率・管理者数の表示（集計とクライアント管理サイトが未実装）
+// 未実装：直近の実績利用率・管理者数の一覧表示
 import { clientStatusLabel, contractTypeLabel, endsSoon, planLabel } from "../../../ops/clients";
 import { apiErrorMessage } from "../../../ops/format";
 import { useTestFilter } from "../../../ops/testFilter";

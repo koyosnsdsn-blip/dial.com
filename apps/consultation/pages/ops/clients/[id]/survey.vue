@@ -77,7 +77,7 @@ async function save() {
       message.value = "設問を追加しました。";
     } else {
       const res = await $fetch<{ replaced: boolean }>(`/api/ops/clients/${clientId.value}/survey/${editing.value}`, { method: "PATCH", body: { action: "edit", ...payload } });
-      message.value = res.replaced ? "回答済みの設問だったため、元の設問を取り下げて、新しい設問として登録しました。" : "設問を変更しました。";
+      message.value = res.replaced ? "設問を変更しました。元の設問は取り下げ、新しい設問として登録しました（過去の回答は、回答時点の設問文のまま残ります）。" : "設問を変更しました。";
     }
     editing.value = null;
     await load();

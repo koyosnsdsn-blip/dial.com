@@ -2,7 +2,7 @@
 // - 削除操作の時点でやり取りを非表示にし、猶予期間の経過後に物理削除する（DB関数 user_delete_case）
 // - 以後、本人の相談履歴には表示されない
 // - 記録→削除の順（監査ログに記録できなければ削除しない）
-// 【仮】猶予期間は30日（未決事項 No.9）。物理削除の自動実行は未実装
+// 【仮】猶予期間は30日（未決事項 No.9）。物理削除は毎日の定期処理（pg_cron の purge-deleted）が行う
 // 自治体委託型：委託元へ報告済みの記録は、この操作では消えない（3.12.5）。画面側で明示する
 export default defineEventHandler(async (event) => {
   const account = await requireAccount(event);

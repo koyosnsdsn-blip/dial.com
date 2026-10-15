@@ -123,6 +123,9 @@ async function loadSummary() {
   }
 }
 
+// 一覧が上限で切り捨てられているとき、全体の件数（0 のときは切り捨てなし）
+const truncatedTotal = ref(0);
+
 async function load() {
   try {
     const query: Record<string, string> = { status: filters.status, assignee: filters.assignee, kind: filters.kind, test: testMode.value };
@@ -130,7 +133,11 @@ async function load() {
     if (filters.client) query.client = filters.client;
     if (filters.from) query.from = filters.from;
     if (filters.to) query.to = filters.to;
-    const next = await $fetch<CaseRow[]>("/api/ops/cases", { query });
+    const res = await $fetch.raw<CaseRow[]>("/api/ops/cases", { query });
+    const next = res._data ?? [];
+    // 上限を超えて切り捨てたときは、全体の件数を案内する
+    const total = Number(res.headers.get("x-total-count"));
+    truncatedTotal.value = Number.isFinite(total) && total > next.length ? total : 0;
     // 前回の一覧では緊急でなかった案件が緊急になった場合、目立たせる
     const before = new Map(cases.value.map((c) => [c.caseId, c.urgent]));
     // テスト案件は、タブの点滅と通知音の対象にしない（「テストのみ」を表示している間は対象にする）
@@ -275,6 +282,7 @@ watch(testMode, load);
       <p v-if="loading" class="note">読み込み中…</p>
       <p v-else-if="errorMessage" class="error">{{ errorMessage }}</p>
       <p v-else-if="cases.length === 0" class="note">該当する案件はありません。</p>
+      <p v-if="truncatedTotal > 0" class="warn" role="status">該当する案件が {{ truncatedTotal }} 件あり、先頭の {{ cases.length }} 件だけを表示しています（対応中・緊急・返信待ちの古い順）。期間やクライアントで絞り込んでください。</p>
 
       <div v-else class="table-wrap">
         <table class="cases">

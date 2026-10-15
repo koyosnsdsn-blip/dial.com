@@ -39,7 +39,7 @@ export type VideoInput = {
 export function parseVideoInput(body: any): VideoInput {
   const title = requireText(body?.title, "title", 100);
   const text = (v: unknown, max: number) => (typeof v === "string" && v.trim() !== "" ? v.trim().slice(0, max) : null);
-  if (!(body?.scopePersonal in SCOPE_PERSONAL) || !(body?.scopeBusiness in SCOPE_BUSINESS)) throw createError({ statusCode: 400, statusMessage: "invalid_scope" });
+  if (typeof body?.scopePersonal !== "string" || typeof body?.scopeBusiness !== "string" || !Object.hasOwn(SCOPE_PERSONAL, body.scopePersonal) || !Object.hasOwn(SCOPE_BUSINESS, body.scopeBusiness)) throw createError({ statusCode: 400, statusMessage: "invalid_scope" });
   const minutes = body?.durationMin === "" || body?.durationMin === null || body?.durationMin === undefined ? null : Number(body.durationMin);
   if (minutes !== null && (!Number.isFinite(minutes) || minutes < 0 || minutes > 1000)) throw createError({ statusCode: 400, statusMessage: "invalid_value" });
   const clientIds = body.scopeBusiness === "some" && Array.isArray(body?.clientIds) ? [...new Set((body.clientIds as unknown[]).map((c) => requireUuid(c, "client_id")))] : [];

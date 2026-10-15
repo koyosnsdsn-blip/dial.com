@@ -13,6 +13,9 @@
 //   client   = 契約クライアントのID
 //   from, to = 利用権の付与日（＝案件の開始日。日本時間の日付 YYYY-MM-DD）の範囲
 //   test     = all（既定）| hide（実運用のみ）| only（テストのみ）
+//
+// 件数の上限：1回に最大 MAX_ROWS 件。上限を超えるときは、SQL の並び順（対応中を先に、緊急、返信待ちの古い順）で先頭から取るので、
+// 緊急の案件や待たせている案件が切り捨てられることはない。切り捨てたときは、全体の件数を X-Total-Count に付ける（画面が案内を出す）。
 import { writeAudit } from "../../../ops/audit";
 import { requireStaff } from "../../../ops/auth";
 import { HURRY_ANSWER, caseLimits, clientNames, deletedCases, frequentUseFlags, quickRestartFlags } from "../../../ops/cases";
@@ -20,6 +23,7 @@ import { userDb } from "../../../ops/db";
 import { getSettings } from "../../../ops/settings";
 import { applyTestMode, parseTestMode } from "../../../ops/testFilter";
 import { requireUuid } from "../../../utils/validate";
+const MAX_ROWS = 1000;
 export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event);
   const q = getQuery(event);
@@ -35,8 +39,12 @@ export default defineEventHandler(async (event) => {
 
   let request = (await userDb(event))
     .from("cases")
-    .select("case_id, account_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, is_test, counselor_id, counselor:counselors!fk_cases_counselor(name)")
-    .limit(300);
+    .select("case_id, account_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, is_test, counselor_id, counselor:counselors!fk_cases_counselor(name)", { count: "exact" })
+    .order("status", { ascending: false }) // open が closed より先
+    .order("urgent_flag", { ascending: false })
+    .order("awaiting_reply_since", { ascending: true, nullsFirst: false })
+    .order("last_activity_at", { ascending: true })
+    .limit(MAX_ROWS);
   request = applyTestMode(request, testMode);
   if (status !== "all") request = request.eq("status", status);
   if (assignee === "me") request = request.eq("counselor_id", staff.userId);
@@ -48,7 +56,7 @@ export default defineEventHandler(async (event) => {
   if (from) request = request.gte("opened_at", `${from}T00:00:00+09:00`);
   if (to) request = request.lte("opened_at", `${to}T23:59:59.999+09:00`);
 
-  const { data, error } = await request;
+  const { data, error, count } = await request;
   if (error) {
     console.error("[cases.list] query failed", error.code);
     throw createError({ statusCode: 500, statusMessage: "query_failed" });
@@ -78,6 +86,7 @@ export default defineEventHandler(async (event) => {
   ]);
 
   await writeAudit(event, staff, { action: "case.list", targetType: "cases" });
+  if (typeof count === "number" && count > rows.length) setResponseHeader(event, "X-Total-Count", String(count));
 
   const items = rows.map((r) => {
     const l = limits.get(r.case_id);

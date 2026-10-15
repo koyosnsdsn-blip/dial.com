@@ -2,7 +2,7 @@
 // 先生の管理（未決事項 2.19）。運営管理者のみ。
 // 先生＝公開Q&Aにコメントをお寄せいただく専門家（弁護士・社労士・メンタル相談の先生など）。相談員とは別のアカウント・別の入口（/ops/expert-login）。
 // 登録（招待）、表示内容の変更、担当ジャンルの割り当て、停止／再開。いずれも理由が必須で、監査ログに記録される。
-import { apiErrorMessage, formatDateTime } from "../../ops/format";
+import { apiErrorMessage, formatDateTime, setupMailMessage } from "../../ops/format";
 type ExpertRow = {
   expertId: string;
   displayName: string;
@@ -39,9 +39,6 @@ async function load() {
   }
 }
 
-// 【暫定】パスワード設定用のリンク（メール送信の仕組みが入るまで、メールの代わりに画面へ表示する）
-const setupLink = ref<{ name: string; link: string; note: string } | null>(null);
-
 // 登録
 const invite = reactive({ email: "", displayName: "", qualification: "", affiliation: "", bio: "", genreIds: [] as string[] });
 const inviting = ref(false);
@@ -51,9 +48,8 @@ async function sendInvite() {
   inviteError.value = "";
   message.value = "";
   try {
-    const res = await $fetch<{ link: string; note: string }>("/api/ops/experts", { method: "POST", body: { ...invite } });
-    setupLink.value = { name: invite.displayName.trim(), link: res.link, note: res.note };
-    message.value = `${invite.displayName.trim()} 先生を登録しました。下のリンクを本人に渡してください。本人がパスワードと2段階認証を設定すると利用できます。`;
+    const res = await $fetch<{ mailSent: boolean; to: string }>("/api/ops/experts", { method: "POST", body: { ...invite } });
+    message.value = setupMailMessage(res, `${invite.displayName.trim()} 先生`, "登録");
     Object.assign(invite, { email: "", displayName: "", qualification: "", affiliation: "", bio: "", genreIds: [] });
     await load();
   } catch (e: any) {
@@ -94,13 +90,13 @@ async function save() {
     saving.value = false;
   }
 }
-async function reissueLink() {
+async function resendMail() {
   if (!current.value) return;
   issuing.value = true;
   editError.value = "";
   try {
-    const res = await $fetch<{ link: string; note: string }>(`/api/ops/experts/${current.value.expertId}/link`, { method: "POST", body: { reason: form.reason } });
-    setupLink.value = { name: current.value.displayName, link: res.link, note: res.note };
+    const res = await $fetch<{ mailSent: boolean; to: string }>(`/api/ops/experts/${current.value.expertId}/resend`, { method: "POST", body: { reason: form.reason } });
+    message.value = setupMailMessage(res, `${current.value.displayName} 先生`, "再送");
   } catch (e: any) {
     editError.value = apiErrorMessage(e);
   } finally {
@@ -121,7 +117,6 @@ onMounted(load);
         先生は <code>/ops/expert-login</code> からログインします（相談員の入口とは別です）。
       </p>
       <p v-if="message" class="ok" role="status">{{ message }}</p>
-      <SetupLinkBox v-if="setupLink" :name="setupLink.name" :link="setupLink.link" :note="setupLink.note" @close="setupLink = null" />
 
       <p v-if="loading" class="note">読み込み中…</p>
       <p v-else-if="errorMessage" class="error">{{ errorMessage }}</p>
@@ -177,8 +172,8 @@ onMounted(load);
         <div class="row">
           <button class="secondary" type="button" @click="editing = null">閉じる</button>
           <button type="button" :disabled="saving || form.reason.trim() === '' || form.genreIds.length === 0" @click="save">{{ saving ? "保存中…" : "保存する" }}</button>
-          <button v-if="current.status === 'active'" class="secondary" type="button" :disabled="issuing || form.reason.trim() === ''" @click="reissueLink">
-            {{ issuing ? "発行中…" : "パスワード設定用のリンクを発行" }}
+          <button v-if="current.status === 'active'" class="secondary" type="button" :disabled="issuing || form.reason.trim() === ''" @click="resendMail">
+            {{ issuing ? "送信中…" : "パスワード設定用のメールを再送" }}
           </button>
         </div>
         <p v-if="editError" class="error" role="alert">{{ editError }}</p>
@@ -198,12 +193,12 @@ onMounted(load);
           <label v-for="g in genres" :key="g.genreId" class="check"><input v-model="invite.genreIds" type="checkbox" :value="g.genreId" />{{ g.name }}</label>
         </fieldset>
         <button type="button" :disabled="inviting || !invite.email || !invite.displayName.trim() || !invite.qualification.trim() || invite.genreIds.length === 0" @click="sendInvite">
-          {{ inviting ? "登録中…" : "登録して設定用のリンクを発行" }}
+          {{ inviting ? "登録中…" : "登録して招待メールを送る" }}
         </button>
         <p v-if="inviteError" class="error" role="alert">{{ inviteError }}</p>
         <p class="note">
-          登録すると、パスワード設定用のリンクがこの画面に表示されます。本人に直接渡してください。本人はリンクからパスワードを設定し、続けて2段階認証（認証アプリ）を登録します。<br />
-          【暫定】メールを送る仕組み（未決事項 No.59）が入るまでの運用です。報酬・掲載料などのお金に関わる機能は、法務の確認が済むまで設けません。
+          登録すると、入力したメールアドレスへ招待のメールが届きます。本人はメールのリンクからパスワードを設定し、続けて2段階認証（認証アプリ）を登録します。<br />
+          報酬・掲載料などのお金に関わる機能は、法務の確認が済むまで設けません。
         </p>
       </section>
     </main>
