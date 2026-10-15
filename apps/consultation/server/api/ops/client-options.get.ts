@@ -4,10 +4,10 @@ import { requireStaff } from "../../ops/auth";
 import { serviceDb } from "../../ops/db";
 export default defineEventHandler(async (event) => {
   await requireStaff(event);
-  const { data, error } = await serviceDb(event).from("clients").select("client_id, name, status").order("name");
+  const { data, error } = await serviceDb(event).from("clients").select("client_id, name, status, is_test").order("name");
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
   return (data ?? []).map((c: any) => ({
     clientId: c.client_id as string,
-    name: c.status === "closed" ? `${c.name}（終了）` : (c.name as string),
+    name: `${c.name}${c.status === "closed" ? "（終了）" : ""}${c.is_test ? "（テスト）" : ""}`,
   }));
 });

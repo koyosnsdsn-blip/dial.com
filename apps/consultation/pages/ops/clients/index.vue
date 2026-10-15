@@ -3,7 +3,9 @@
 // 未実装：直近の実績利用率・管理者数の表示（集計とクライアント管理サイトが未実装）
 import { clientStatusLabel, contractTypeLabel, endsSoon, planLabel } from "../../../ops/clients";
 import { apiErrorMessage } from "../../../ops/format";
+import { useTestFilter } from "../../../ops/testFilter";
 type ClientRow = {
+  isTest: boolean;
   clientId: string;
   name: string;
   contractType: "corp" | "muni";
@@ -28,9 +30,13 @@ const filterType = ref("");
 // 終了したクライアントは既定の表示から除外する（要件 7.10.9）
 const filterStatus = ref("not_closed");
 
+// テストの表示・非表示（一覧はすべて取得済みなので、画面側で絞る）
+const testMode = useTestFilter();
+
 const filtered = computed(() =>
   rows.value.filter(
     (r) =>
+      (testMode.value === "all" || (testMode.value === "only") === r.isTest) &&
       (!filterType.value || r.contractType === filterType.value) &&
       (filterStatus.value === "" || (filterStatus.value === "not_closed" ? r.status !== "closed" : r.status === filterStatus.value)),
   ),
@@ -88,6 +94,7 @@ onMounted(load);
       <h1>契約クライアント</h1>
 
       <div class="filters">
+        <TestFilterSelect v-model="testMode" />
         <label>契約類型
           <select v-model="filterType">
             <option value="">すべて</option>
@@ -116,7 +123,7 @@ onMounted(load);
           </thead>
           <tbody>
             <tr v-for="r in filtered" :key="r.clientId" :class="{ closed: r.status === 'closed' }">
-              <td>{{ r.name }}</td>
+              <td>{{ r.name }}<span v-if="r.isTest" class="badge test">テスト</span></td>
               <td>{{ contractTypeLabel[r.contractType] }}</td>
               <td><span class="badge" :class="r.status">{{ clientStatusLabel[r.status] }}</span></td>
               <td>
@@ -205,4 +212,6 @@ button { width: auto; padding: 8px 16px; }
 .badge.active { background: #dafbe1; color: #1a7f37; }
 .badge.prep { background: #fff8c5; color: #7d4e00; }
 .badge.soon { margin-left: 4px; background: #fdecea; color: var(--danger); }
+.badge.test { margin-left: 6px; background: #efe5ff; color: #6639ba; font-weight: 700; }
+.filters :deep(select) { width: auto; }
 </style>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // 監査ログの閲覧（要件 7.16）。運営管理者のみ。閲覧のみ（編集・削除の機能は設けない）。
 import { apiErrorMessage, formatDateTime, shortId } from "../../ops/format";
+import { useTestFilter } from "../../ops/testFilter";
 type Item = {
+  isTest: boolean;
   logId: number;
   actedAt: string;
   actorType: string;
@@ -93,6 +95,8 @@ const ACTIONS: Record<string, { label: string; important?: boolean }> = {
   "account.lookup": { label: "利用者アカウントの照会", important: true },
   "account.posting.suspend": { label: "投稿機能の停止", important: true },
   "account.posting.resume": { label: "投稿機能の停止解除", important: true },
+  "account.test_flag.set": { label: "アカウントをテスト用に設定", important: true },
+  "account.test_flag.clear": { label: "アカウントのテスト用を解除", important: true },
   "export.daily": { label: "CSV出力：日次サマリ", important: true },
   "export.survey_summary": { label: "CSV出力：アンケート集計", important: true },
   "settings.update": { label: "サービス全体設定の変更", important: true },
@@ -154,6 +158,9 @@ const filters = reactive({
   target: typeof route.query.target === "string" ? route.query.target : "",
   actor: "",
 });
+// テストの表示・非表示。ログは書き換えられないため、操作の対象や実行者が「いま」テストかで判定される
+const testMode = useTestFilter();
+watch(testMode, () => search());
 const page = ref(1);
 const data = ref<{ total: number; pageSize: number; items: Item[] } | null>(null);
 const loading = ref(true);
@@ -162,7 +169,7 @@ const errorMessage = ref("");
 async function load() {
   loading.value = true;
   try {
-    const query: Record<string, string | number> = { page: page.value };
+    const query: Record<string, string | number> = { page: page.value, test: testMode.value };
     for (const [k, v] of Object.entries(filters)) if (v) query[k] = v;
     data.value = await $fetch<{ total: number; pageSize: number; items: Item[] }>("/api/ops/audit-logs", { query });
     errorMessage.value = "";
@@ -204,6 +211,7 @@ onMounted(load);
             <option value="audit">監査ログの閲覧</option>
           </select>
         </label>
+        <TestFilterSelect v-model="testMode" />
         <label>開始日<input v-model="filters.from" type="date" /></label>
         <label>終了日<input v-model="filters.to" type="date" /></label>
         <label>対象ID<input v-model="filters.target" placeholder="案件IDなど（完全一致）" /></label>
@@ -227,7 +235,7 @@ onMounted(load);
                   <a v-if="r.actorId" href="#" @click.prevent="filterBy('actor', r.actorId)">{{ r.actorName ?? shortId(r.actorId) }}</a>
                   <span v-else>{{ r.actorType }}</span>
                 </td>
-                <td>{{ ACTIONS[r.action]?.important ? "★ " : "" }}{{ ACTIONS[r.action]?.label ?? r.action }}</td>
+                <td>{{ ACTIONS[r.action]?.important ? "★ " : "" }}{{ ACTIONS[r.action]?.label ?? r.action }}<span v-if="r.isTest" class="badge-test" title="テスト用のクライアント・アカウント・案件に関する記録">テスト</span></td>
                 <td class="nowrap">
                   <template v-if="r.targetId">
                     <NuxtLink v-if="r.targetType === 'cases'" :to="`/ops/cases/${r.targetId}`">{{ shortId(r.targetId) }}</NuxtLink>
@@ -266,6 +274,9 @@ table.logs { width: 100%; border-collapse: collapse; background: #fff; border: 1
 .reason { max-width: 360px; word-break: break-word; }
 .small { margin-left: 8px; font-size: 12px; }
 .muted { color: var(--muted); }
+.badge-test { margin-left: 6px; padding: 1px 8px; font-size: 12px; font-weight: 700; border-radius: 10px; background: #efe5ff; color: #6639ba; }
+.filters :deep(select) { width: auto; min-width: 140px; padding: 6px 8px; font-size: 14px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.filters :deep(label.test-filter) { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .pager { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 .pager button { width: auto; margin: 0; padding: 6px 12px; }
 </style>

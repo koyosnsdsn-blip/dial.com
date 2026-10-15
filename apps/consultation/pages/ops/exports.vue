@@ -3,10 +3,13 @@
 // 出力できる範囲：運営管理者は全案件、相談員は自分の担当案件のみ。出力の操作は監査ログに記録される。
 // 未実装：クライアント提出用（7.9.6。四半期レポートが未実装）
 import { apiErrorMessage } from "../../ops/format";
+import type { TestMode } from "../../ops/testFilter";
 const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 const monthStart = `${today.slice(0, 8)}01`;
 const from = ref(monthStart);
 const to = ref(today);
+// テスト案件の扱い。実運用の集計に混ざらないよう、既定は「除く」（他の一覧の選択とは別に、毎回この既定から始める）
+const testMode = ref<TestMode>("hide");
 const busy = ref("");
 const errorMessage = ref("");
 
@@ -14,7 +17,7 @@ async function download(kind: "cases" | "survey" | "daily" | "survey-summary") {
   busy.value = kind;
   errorMessage.value = "";
   try {
-    const res = await $fetch.raw<Blob>(`/api/ops/exports/${kind}`, { query: { from: from.value, to: to.value }, responseType: "blob" });
+    const res = await $fetch.raw<Blob>(`/api/ops/exports/${kind}`, { query: { from: from.value, to: to.value, test: testMode.value }, responseType: "blob" });
     const url = URL.createObjectURL(res._data as Blob);
     const a = document.createElement("a");
     a.href = url;
@@ -42,6 +45,14 @@ async function download(kind: "cases" | "survey" | "daily" | "survey-summary") {
           <label>まで<input v-model="to" type="date" /></label>
         </div>
         <p class="note">最長1年分、5000件まで。それを超える場合は期間を分けてください。</p>
+        <label class="test-select">テスト用の案件
+          <select v-model="testMode">
+            <option value="hide">除く（実運用のみ）</option>
+            <option value="all">含める（「テスト区分」の列で見分けられます）</option>
+            <option value="only">テストのみ</option>
+          </select>
+        </label>
+        <p class="note">テスト用のクライアント・アカウントの案件です。クライアントへの報告や実績の集計には、「除く」で出力してください。</p>
       </section>
 
       <section class="panel">
@@ -84,5 +95,7 @@ async function download(kind: "cases" | "survey" | "daily" | "survey-summary") {
 .row { display: flex; gap: 16px; }
 .row label { margin: 0; }
 .row input { width: auto; }
+.test-select { display: block; margin-top: 12px; }
+.test-select select { display: block; width: auto; margin-top: 4px; padding: 7px 10px; font-size: 14px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 button { width: auto; padding: 8px 16px; margin-top: 8px; }
 </style>

@@ -23,6 +23,7 @@ type CaseDetail = {
   status: "open" | "closed";
   closeReason: string | null;
   urgent: boolean;
+  isTest: boolean;
   openedAt: string;
   lastActivityAt: string;
   closedAt: string | null;
@@ -332,6 +333,7 @@ onBeforeUnmount(() => clock && clearInterval(clock));
       <p v-else-if="errorMessage" class="error">{{ errorMessage }}</p>
 
       <template v-else-if="detail">
+        <div v-if="detail.isTest" class="test-banner" role="status">この案件はテスト用です（テスト用のクライアント・アカウントの案件。実運用の集計には含めません）</div>
         <div v-if="detail.urgent && detail.status === 'open'" class="urgent-banner" role="alert">この案件には緊急フラグが立っています</div>
 
         <div v-if="detail.deletedByUser" class="deleted-banner" role="status">
@@ -555,6 +557,7 @@ onBeforeUnmount(() => clock && clearInterval(clock));
 
 <style scoped>
 .page { max-width: 1120px; margin: 24px auto; padding: 0 24px; }
+.test-banner { margin-bottom: 12px; padding: 8px 14px; background: #efe5ff; color: #6639ba; border-radius: 6px; font-size: 14px; font-weight: 600; }
 .urgent-banner { margin-bottom: 16px; padding: 12px 16px; color: #fff; background: var(--danger); border-radius: 6px; font-weight: 700; }
 .head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
 .seq { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 8px; }

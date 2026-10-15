@@ -23,6 +23,7 @@ type Detail = {
   slaHours: number;
   rallyMax: number;
   inviteCode: string | null;
+  isTest: boolean;
   members: number;
   openCases: number;
   totalCases: number;
@@ -54,6 +55,7 @@ const form = reactive({
   rallyMax: 1,
   slaHours: 24,
   counselorIds: [] as string[],
+  isTest: false,
   reason: "",
   approvedBy: "",
 });
@@ -71,6 +73,7 @@ function fill(d: Detail) {
     rallyMax: d.rallyMax,
     slaHours: d.slaHours,
     counselorIds: [...d.counselorIds],
+    isTest: d.isTest,
     reason: "",
     approvedBy: "",
   });
@@ -149,6 +152,7 @@ function save() {
         rallyMax: form.rallyMax,
         slaHours: form.slaHours,
         counselorIds: form.counselorIds,
+        isTest: form.isTest,
         reason: form.reason,
         approvedBy: form.approvedBy,
       },
@@ -216,6 +220,7 @@ onMounted(load);
           編集中のクライアント：<strong>{{ detail.name }}</strong>
           <span class="badge" :class="detail.status">{{ clientStatusLabel[detail.status] }}</span>
           <span class="badge type">{{ contractTypeLabel[detail.contractType] }}（変更不可）</span>
+          <span v-if="detail.isTest" class="badge test">テスト用</span>
         </div>
         <p v-if="message" class="ok" role="status">{{ message }}</p>
         <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
@@ -270,6 +275,14 @@ onMounted(load);
               <label v-if="detail.contractType === 'corp'">契約上の従業員数<input v-model="form.employeeCount" type="number" min="1" /></label>
               <label v-if="detail.contractType === 'corp'">想定利用率（%）<input v-model="form.assumedUsageRate" type="number" min="0" max="100" step="0.1" /></label>
             </div>
+
+            <h3>テスト用の設定</h3>
+            <label class="check"><input v-model="form.isTest" type="checkbox" />テスト用のクライアントとして扱う</label>
+            <p v-if="form.isTest !== detail.isTest" class="warn">
+              {{ form.isTest ? "オンにすると、このクライアントの案件（所属アカウントの個人の相談も）がすべて「テスト」になります。" : "オフにすると、このクライアントの案件は「テスト」ではなくなります（アカウント自身がテスト用に設定されている案件は、テストのままです）。" }}
+              保存すると、既存の案件にもすぐ反映されます。
+            </p>
+            <p v-else class="note">テスト用の案件は、案件一覧・監査ログ・CSV出力で「テスト」として見分けられ、表示／非表示を切り替えられます。相談者・クライアント管理者には表示されません。</p>
 
             <h3>機能の有効・無効</h3>
             <div class="checks">
@@ -390,5 +403,6 @@ button.small { margin: 0 0 0 8px; padding: 4px 10px; font-size: 13px; }
 .badge { display: inline-block; margin-left: 8px; padding: 2px 8px; font-size: 12px; border-radius: 10px; background: #eaeef2; color: var(--muted); }
 .badge.active { background: #dafbe1; color: #1a7f37; }
 .badge.prep { background: #fff8c5; color: #7d4e00; }
+.badge.test { background: #efe5ff; color: #6639ba; font-weight: 700; }
 .muted { color: var(--muted); }
 </style>

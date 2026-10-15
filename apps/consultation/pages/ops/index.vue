@@ -8,11 +8,13 @@ import { apiErrorMessage, formatCloseReason, formatElapsed, formatWaiting, short
 import { useCaseRealtime } from "../../ops/useCaseRealtime";
 import { noteUrgent, playNotifySound } from "../../ops/notifySound";
 import { useStaff } from "../../ops/useStaff";
+import { useTestFilter } from "../../ops/testFilter";
 type CaseRow = {
   caseId: string;
   status: "open" | "closed";
   closeReason: string | null;
   urgent: boolean;
+  isTest: boolean;
   openedAt: string;
   lastActivityAt: string;
   awaitingReplySince: string | null;
@@ -39,6 +41,8 @@ const newlyUrgent = ref<Set<string>>(new Set());
 const now = ref(Date.now());
 const filters = reactive({ status: "open", assignee: "all", kind: "all", urgent: false, client: "", from: "", to: "" });
 const clientOptions = ref<ClientOption[]>([]);
+// テストの表示・非表示（一覧と、上の件数の両方に効く。選択はこのブラウザに覚える）
+const testMode = useTestFilter();
 
 // 並べ替え（列の見出しをクリック）。何も選んでいない間は、サーバーが返す順（緊急 → 待たせている順）のまま。
 // 対応中の緊急案件は、どの並べ替えでも最上位に固定する（見落とし防止：要件 7.1）
@@ -113,7 +117,7 @@ const awaitingCount = computed(() => summary.value?.awaiting ?? 0);
 const unassignedCount = computed(() => summary.value?.unassigned ?? 0);
 async function loadSummary() {
   try {
-    summary.value = await $fetch<Summary>("/api/ops/dashboard-summary");
+    summary.value = await $fetch<Summary>("/api/ops/dashboard-summary", { query: { test: testMode.value } });
   } catch {
     /* 一覧の表示は続ける */
   }
@@ -121,7 +125,7 @@ async function loadSummary() {
 
 async function load() {
   try {
-    const query: Record<string, string> = { status: filters.status, assignee: filters.assignee, kind: filters.kind };
+    const query: Record<string, string> = { status: filters.status, assignee: filters.assignee, kind: filters.kind, test: testMode.value };
     if (filters.urgent) query.urgent = "1";
     if (filters.client) query.client = filters.client;
     if (filters.from) query.from = filters.from;
@@ -197,6 +201,7 @@ onBeforeUnmount(() => {
   if (titleTimer) clearInterval(titleTimer);
 });
 watch(filters, load);
+watch(testMode, load);
 </script>
 
 <template>
@@ -253,6 +258,7 @@ watch(filters, load);
             <option value="corp">企業枠</option>
           </select>
         </label>
+        <TestFilterSelect v-model="testMode" />
         <label>契約クライアント
           <select v-model="filters.client">
             <option value="">すべて</option>
@@ -292,6 +298,7 @@ watch(filters, load);
                 <span v-if="c.quickRestart" class="badge restart" title="前回の終了から短期間で開始された相談">短期間での再開</span>
                 <span v-if="c.frequentUse" class="badge restart" title="同じ相談者が短い期間に何度も相談を開始しています（確認の契機）">利用が頻繁</span>
                 <span v-if="c.deletedByUser" class="badge muted" title="利用者本人が削除した相談（やり取りは非表示）">本人が削除</span>
+                <span v-if="c.isTest" class="badge test" title="テスト用のクライアント・アカウントの案件（実運用の集計には含めません）">テスト</span>
               </td>
               <td><NuxtLink :to="`/ops/cases/${c.caseId}`">{{ shortId(c.caseId) }}</NuxtLink><span class="sub">{{ formatOpened(c.openedAt) }}</span></td>
               <td :class="['wait', level(c)]">{{ c.status === "open" && c.awaitingReplySince ? formatWaiting(c.awaitingReplySince, now) : "—" }}</td>
@@ -346,6 +353,9 @@ table.cases { width: 100%; border-collapse: collapse; background: #fff; border: 
 .badge.muted { background: #eaeef2; color: var(--muted); }
 .badge.hurry { margin-left: 4px; background: #fdecea; color: var(--danger); font-weight: 700; }
 .badge.restart { margin-left: 4px; background: #fff8c5; color: #7d4e00; }
+.badge.test { margin-left: 4px; background: #efe5ff; color: #6639ba; font-weight: 700; }
+.filters :deep(select) { padding: 6px 8px; font-size: 14px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.filters :deep(label.test-filter) { margin: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .filters input[type="date"] { width: auto; padding: 5px 8px; font-size: 14px; }
 .mine { color: var(--muted); font-size: 12px; }
 </style>

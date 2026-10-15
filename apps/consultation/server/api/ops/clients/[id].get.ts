@@ -46,6 +46,7 @@ export default defineEventHandler(async (event) => {
     slaHours: r.sla_hours as number,
     rallyMax: r.rally_max as number,
     inviteCode: r.invite_code as string | null,
+    isTest: r.is_test as boolean,
     members: members ?? 0,
     openCases: openCases ?? 0,
     totalCases: totalCases ?? 0,

@@ -1,9 +1,13 @@
 // 監査ログの閲覧（要件 7.16）。運営管理者のみ。閲覧のみで、編集・削除の機能は設けない（DBでも拒否される）。
 // 絞り込み：実行者（actor）、操作種別（action の前方一致）、対象ID（target）、期間（from / to：YYYY-MM-DD、日本時間）
+// テスト：test = all（既定）| hide（実運用のみ）| only（テストのみ）。
+//   ログは追記専用で書き換えられないため、ビュー audit_logs_v が「いま」の状態で判定する
+//   （対象の案件・クライアント・アカウント、または実行者がテストなら、テストのログ）。
 // 監査ログの閲覧自体も監査ログに記録する。
 import { writeAudit } from "../../ops/audit";
 import { requireStaff } from "../../ops/auth";
 import { serviceDb, userDb } from "../../ops/db";
+import { applyTestMode, parseTestMode } from "../../ops/testFilter";
 import { requireUuid } from "../../utils/validate";
 export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event, { adminOnly: true });
@@ -14,10 +18,11 @@ export default defineEventHandler(async (event) => {
 
   // 本人の権限で読む（RLS：aal2 の運営管理者のみ参照可）
   let request = (await userDb(event))
-    .from("audit_logs")
-    .select("log_id, actor_type, actor_id, action, target_type, target_id, reason, acted_at", { count: "exact" })
+    .from("audit_logs_v")
+    .select("log_id, actor_type, actor_id, action, target_type, target_id, reason, acted_at, is_test", { count: "exact" })
     .order("log_id", { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1);
+  request = applyTestMode(request, parseTestMode(event));
 
   if (typeof q.actor === "string" && q.actor) request = request.eq("actor_id", requireUuid(q.actor, "actor"));
   if (typeof q.target === "string" && q.target) request = request.eq("target_id", requireUuid(q.target, "target"));
@@ -58,6 +63,7 @@ export default defineEventHandler(async (event) => {
       targetType: r.target_type as string,
       targetId: r.target_id as string | null,
       reason: r.reason as string | null,
+      isTest: r.is_test as boolean,
     })),
   };
 });

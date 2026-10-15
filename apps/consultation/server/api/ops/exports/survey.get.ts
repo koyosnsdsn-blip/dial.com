@@ -10,16 +10,18 @@ import { requireStaff } from "../../../ops/auth";
 import { caseLimits, clientNames } from "../../../ops/cases";
 import { EXPORT_MAX_ROWS, exportRange, jstDateTime, sendCsv, toCsv } from "../../../ops/csv";
 import { userDb } from "../../../ops/db";
+import { applyTestMode, parseTestMode, testLabel } from "../../../ops/testFilter";
 export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event);
   const range = exportRange(event);
+  // テスト案件の扱い：既定は除外。test=all で含める、test=only でテストのみ
+  const testMode = parseTestMode(event, "hide");
   const db = await userDb(event);
 
-  const { data, error } = await db
-    .from("cases")
-    .select("case_id, client_id, opened_at")
-    .gte("opened_at", range.fromTs)
-    .lte("opened_at", range.toTs)
+  const { data, error } = await applyTestMode(
+    db.from("cases").select("case_id, client_id, opened_at, is_test").gte("opened_at", range.fromTs).lte("opened_at", range.toTs),
+    testMode,
+  )
     .order("opened_at", { ascending: true })
     .limit(EXPORT_MAX_ROWS + 1);
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
@@ -58,15 +60,16 @@ export default defineEventHandler(async (event) => {
   await writeAudit(event, staff, {
     action: "export.survey",
     targetType: "case_survey_answers",
-    reason: `アンケート回答明細 ${range.from}〜${range.to}／${rows.length}件`,
+    reason: `アンケート回答明細 ${range.from}〜${range.to}／${rows.length}件／テスト：${testLabel(testMode)}`,
   });
 
-  const header = ["案件ID", "利用権の付与日", "付与元", "契約クライアント名", ...columns.map((c) => c.label)];
+  const header = ["案件ID", "利用権の付与日", "付与元", "契約クライアント名", "テスト区分", ...columns.map((c) => c.label)];
   const out = rows.map((r) => [
     r.case_id,
     jstDateTime(r.opened_at).slice(0, 10),
     limits.get(r.case_id)?.source === "client" ? "企業枠" : "個人課金",
     r.client_id ? names.get(r.client_id) ?? "" : "",
+    r.is_test ? "テスト" : "",
     ...columns.map((c) => answers.get(r.case_id)?.get(c.key) ?? ""),
   ]);
   return sendCsv(event, `survey_${range.from}_${range.to}.csv`, toCsv(header, out));

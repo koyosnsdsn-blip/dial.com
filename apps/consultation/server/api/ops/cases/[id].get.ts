@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const { data: row, error } = await db
     .from("cases")
     .select(
-      "case_id, account_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, counselor_id, counselor:counselors!fk_cases_counselor(name)",
+      "case_id, account_id, status, close_reason, urgent_flag, is_test, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, counselor_id, counselor:counselors!fk_cases_counselor(name)",
     )
     .eq("case_id", caseId)
     .maybeSingle();
@@ -94,6 +94,7 @@ export default defineEventHandler(async (event) => {
     status: r.status as "open" | "closed",
     closeReason: r.close_reason as string | null,
     urgent: r.urgent_flag as boolean,
+    isTest: r.is_test as boolean,
     openedAt: r.opened_at as string,
     lastActivityAt: r.last_activity_at as string,
     closedAt: r.closed_at as string | null,

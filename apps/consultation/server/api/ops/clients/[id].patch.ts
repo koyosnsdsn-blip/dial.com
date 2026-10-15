@@ -1,6 +1,6 @@
 // 契約クライアントの設定変更（要件 7.10.2・7.10.3・7.10.9）。運営管理者のみ。理由は必須で、監査ログに変更前後を記録する。
 // 変更できるもの：名称、契約期間、契約上の従業員数、想定利用率、機能の有効・無効、ラリー回数、返信SLA、
-//                 割当対象の相談員、契約ステータス（準備中 → 有効 のみ。終了は専用のAPI）
+//                 割当対象の相談員、契約ステータス（準備中 → 有効 のみ。終了は専用のAPI）、テストフラグ（isTest）
 // 守ること：
 //   - 契約類型は変更できない（3.12.2。DBのトリガでも拒否される）
 //   - ラリー回数・返信SLAはプリセットから選ぶ。24時間未満のSLA・4回以上のラリーは、体制側の承認者の記録が必要（3.2.4・3.2.5）
@@ -39,6 +39,15 @@ export default defineEventHandler(async (event) => {
   const start = (patch.contract_start ?? cur.contract_start) as string | null;
   const end = (patch.contract_end ?? cur.contract_end) as string | null;
   if (start && end && start > end) throw createError({ statusCode: 400, statusMessage: "invalid_date" });
+  // テストフラグ：オンにすると、このクライアントの案件（所属アカウントの個人の相談も）はすべてテスト扱いになる。
+  // 案件側の反映は DB のトリガが行う
+  if (body.isTest !== undefined) {
+    if (typeof body.isTest !== "boolean") throw createError({ statusCode: 400, statusMessage: "invalid_value" });
+    if (body.isTest !== cur.is_test) {
+      patch.is_test = body.isTest;
+      changes.push(body.isTest ? "テスト用に設定" : "テスト用を解除");
+    }
+  }
   if (body.employeeCount !== undefined) set("employee_count", "従業員数", optionalInt(body.employeeCount, "employee_count", 1, 10_000_000));
   if (body.assumedUsageRate !== undefined) {
     const next = optionalRate(body.assumedUsageRate);

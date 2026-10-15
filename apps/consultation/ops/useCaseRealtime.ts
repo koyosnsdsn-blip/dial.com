@@ -8,6 +8,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { authClient } from "./authClient";
 import { noteUrgent, playNotifySound } from "./notifySound";
+import { useTestFilter } from "./testFilter";
 
 export type RealtimeStatus = "connecting" | "live" | "error";
 
@@ -15,6 +16,7 @@ export function useCaseRealtime(onChange: (kind: "case" | "message", caseId: str
   // 運営画面の認証Cookie（sb-ops-auth-token）のセッションで購読する
   const supabase = authClient("ops");
   const status = ref<RealtimeStatus>("connecting");
+  const testMode = useTestFilter();
   let channel: RealtimeChannel | null = null;
 
   onMounted(async () => {
@@ -28,9 +30,12 @@ export function useCaseRealtime(onChange: (kind: "case" | "message", caseId: str
       .channel("staff-cases")
       .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, (payload: any) => {
         // 通知音（運営画面の「通知音」が ON のときだけ鳴る）。行データは音の種類を決めるためだけに使い、画面には出さない
-        if (payload.eventType === "INSERT") playNotifySound("case");
-        else if (payload.eventType === "UPDATE" && payload.new?.case_id && payload.new.status === "open") {
-          if (noteUrgent(payload.new.case_id, Boolean(payload.new.urgent_flag))) playNotifySound("urgent");
+        // テスト案件は、「テストを隠す」にしている間は鳴らさない（メッセージの合図には案件のテスト区分がないため、メッセージ音は対象外）
+        const muted = Boolean(payload.new?.is_test) && testMode.value === "hide";
+        if (payload.eventType === "INSERT") {
+          if (!muted) playNotifySound("case");
+        } else if (payload.eventType === "UPDATE" && payload.new?.case_id && payload.new.status === "open") {
+          if (noteUrgent(payload.new.case_id, Boolean(payload.new.urgent_flag)) && !muted) playNotifySound("urgent");
         }
         onChange("case", (payload.new?.case_id ?? payload.old?.case_id ?? null) as string | null);
       })

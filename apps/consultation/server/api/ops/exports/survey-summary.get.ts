@@ -1,21 +1,24 @@
 // 社内業務用：アンケート集計の CSV（要件 7.9.5）。設問・選択肢ごとの件数と構成比、「答えない」の選択率。
 // - 個人を識別する情報は含めない。範囲は本人の権限（RLS）に従う
 // - この出力はクライアントへ提出しない（最小集計単位の制限を掛けていない。クライアント向けは 7.9.6）
-// 絞り込み：期間（必須）、契約クライアント（client）、付与元（kind = corp / personal）
+// 絞り込み：期間（必須）、契約クライアント（client）、付与元（kind = corp / personal）、テスト（test = hide（既定）/ all / only）
 import { writeAudit } from "../../../ops/audit";
 import { requireStaff } from "../../../ops/auth";
 import { EXPORT_MAX_ROWS, exportRange, sendCsv, toCsv } from "../../../ops/csv";
 import { userDb } from "../../../ops/db";
 import { DECLINE_LABEL } from "../../../ops/survey";
+import { applyTestMode, parseTestMode, testLabel } from "../../../ops/testFilter";
 import { requireUuid } from "../../../utils/validate";
 export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event);
   const range = exportRange(event);
   const q = getQuery(event);
   const clientId = typeof q.client === "string" && q.client ? requireUuid(q.client, "client") : null;
+  // テスト案件の扱い：既定は除外（実運用の集計に混ぜない）。test=all で含める、test=only でテストのみ
+  const testMode = parseTestMode(event, "hide");
   const db = await userDb(event);
 
-  let request = db.from("cases").select("case_id, client_id").gte("opened_at", range.fromTs).lte("opened_at", range.toTs).limit(EXPORT_MAX_ROWS + 1);
+  let request = applyTestMode(db.from("cases").select("case_id, client_id").gte("opened_at", range.fromTs).lte("opened_at", range.toTs), testMode).limit(EXPORT_MAX_ROWS + 1);
   if (clientId) request = request.eq("client_id", clientId);
   if (q.kind === "corp") request = request.not("client_id", "is", null);
   if (q.kind === "personal") request = request.is("client_id", null);
@@ -37,7 +40,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  await writeAudit(event, staff, { action: "export.survey_summary", targetType: "case_survey_answers", reason: `アンケート集計 ${range.from}〜${range.to}／${ids.length}件` });
+  await writeAudit(event, staff, { action: "export.survey_summary", targetType: "case_survey_answers", reason: `アンケート集計 ${range.from}〜${range.to}／${ids.length}件／テスト：${testLabel(testMode)}` });
 
   const header = ["対象期間", "分類", "設問", "選択肢", "件数", "構成比", "「答えない」の選択率"];
   const out: unknown[][] = [];

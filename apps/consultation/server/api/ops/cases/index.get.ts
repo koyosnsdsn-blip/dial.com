@@ -12,11 +12,13 @@
 //   urgent   = 1 で緊急のみ
 //   client   = 契約クライアントのID
 //   from, to = 利用権の付与日（＝案件の開始日。日本時間の日付 YYYY-MM-DD）の範囲
+//   test     = all（既定）| hide（実運用のみ）| only（テストのみ）
 import { writeAudit } from "../../../ops/audit";
 import { requireStaff } from "../../../ops/auth";
 import { HURRY_ANSWER, caseLimits, clientNames, deletedCases, frequentUseFlags, quickRestartFlags } from "../../../ops/cases";
 import { userDb } from "../../../ops/db";
 import { getSettings } from "../../../ops/settings";
+import { applyTestMode, parseTestMode } from "../../../ops/testFilter";
 import { requireUuid } from "../../../utils/validate";
 export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event);
@@ -29,11 +31,13 @@ export default defineEventHandler(async (event) => {
   const day = /^\d{4}-\d{2}-\d{2}$/;
   const from = typeof q.from === "string" && day.test(q.from) ? q.from : null;
   const to = typeof q.to === "string" && day.test(q.to) ? q.to : null;
+  const testMode = parseTestMode(event);
 
   let request = (await userDb(event))
     .from("cases")
-    .select("case_id, account_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, counselor_id, counselor:counselors!fk_cases_counselor(name)")
+    .select("case_id, account_id, status, close_reason, urgent_flag, opened_at, last_activity_at, closed_at, rally_used, awaiting_reply_since, client_id, is_test, counselor_id, counselor:counselors!fk_cases_counselor(name)")
     .limit(300);
+  request = applyTestMode(request, testMode);
   if (status !== "all") request = request.eq("status", status);
   if (assignee === "me") request = request.eq("counselor_id", staff.userId);
   if (assignee === "unassigned") request = request.is("counselor_id", null);
@@ -83,6 +87,7 @@ export default defineEventHandler(async (event) => {
       status: r.status as "open" | "closed",
       closeReason: r.close_reason as string | null,
       urgent: r.urgent_flag as boolean,
+      isTest: r.is_test as boolean,
       openedAt: r.opened_at as string,
       lastActivityAt: r.last_activity_at as string,
       closedAt: r.closed_at as string | null,

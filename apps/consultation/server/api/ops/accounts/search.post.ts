@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   const db = serviceDb(event);
   const { data: a, error } = await db
     .from("accounts")
-    .select("account_id, email, tier, client_id, posting_suspended, created_at, deleted_at")
+    .select("account_id, email, tier, client_id, posting_suspended, is_test, created_at, deleted_at")
     .eq("email", email)
     .maybeSingle();
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
@@ -37,12 +37,14 @@ export default defineEventHandler(async (event) => {
   });
   if (!a) return { found: false as const };
 
-  const [{ count: caseCount }, { count: openCount }, { count: questionCount }, names] = await Promise.all([
+  const [{ count: caseCount }, { count: openCount }, { count: questionCount }, names, { data: clientRow }] = await Promise.all([
     db.from("cases").select("case_id", { count: "exact", head: true }).eq("account_id", a.account_id),
     db.from("cases").select("case_id", { count: "exact", head: true }).eq("account_id", a.account_id).eq("status", "open"),
     db.from("questions").select("*", { count: "exact", head: true }).eq("account_id", a.account_id),
     clientNames(event, [a.client_id]),
+    a.client_id ? db.from("clients").select("is_test").eq("client_id", a.client_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  const testByClient = Boolean((clientRow as { is_test?: boolean } | null)?.is_test);
 
   return {
     found: true as const,
@@ -54,6 +56,9 @@ export default defineEventHandler(async (event) => {
       tier: a.tier as "free" | "paid" | "member",
       clientName: a.client_id ? names.get(a.client_id) ?? null : null,
       postingSuspended: a.posting_suspended as boolean,
+      // テストフラグ：isTest はこのアカウント自身の設定。testByClient は所属クライアントがテスト（その場合は常にテスト扱い）
+      isTest: a.is_test as boolean,
+      testByClient,
       createdAt: a.created_at as string,
       deleted: Boolean(a.deleted_at),
       caseCount: caseCount ?? 0,

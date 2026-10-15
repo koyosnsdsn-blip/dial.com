@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   const [{ data: rows, error }, { data: members, error: memberError }, { data: openCases, error: caseError }] = await Promise.all([
     db
       .from("clients")
-      .select("client_id, name, contract_type, status, contract_start, contract_end, employee_count, feature_qa, feature_consult, feature_video, sla_hours, rally_max, invite_code, created_at")
+      .select("client_id, name, contract_type, status, contract_start, contract_end, employee_count, feature_qa, feature_consult, feature_video, sla_hours, rally_max, invite_code, is_test, created_at")
       .order("created_at", { ascending: false }),
     db.from("accounts").select("client_id").not("client_id", "is", null).is("deleted_at", null),
     db.from("cases").select("client_id").eq("status", "open").not("client_id", "is", null),
@@ -41,6 +41,7 @@ export default defineEventHandler(async (event) => {
     slaHours: r.sla_hours as number,
     rallyMax: r.rally_max as number,
     hasInviteCode: Boolean(r.invite_code),
+    isTest: r.is_test as boolean,
     members: memberCount.get(r.client_id) ?? 0,
     openCases: openCount.get(r.client_id) ?? 0,
   }));

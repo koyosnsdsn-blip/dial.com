@@ -9,16 +9,22 @@ import { requireStaff } from "../../../ops/auth";
 import { caseLimits, clientNames } from "../../../ops/cases";
 import { EXPORT_MAX_ROWS, exportRange, jstDateTime, sendCsv, toCsv } from "../../../ops/csv";
 import { userDb } from "../../../ops/db";
+import { applyTestMode, parseTestMode, testLabel } from "../../../ops/testFilter";
 export default defineEventHandler(async (event) => {
   const staff = await requireStaff(event);
   const range = exportRange(event);
+  // テスト案件の扱い：既定は除外（実運用の集計に混ぜない）。test=all で含める、test=only でテストのみ
+  const testMode = parseTestMode(event, "hide");
   const db = await userDb(event);
 
-  const { data, error } = await db
-    .from("cases")
-    .select("case_id, account_id, client_id, status, close_reason, urgent_flag, rally_used, opened_at, last_activity_at, closed_at, awaiting_reply_since, counselor:counselors!fk_cases_counselor(name)")
-    .gte("opened_at", range.fromTs)
-    .lte("opened_at", range.toTs)
+  const { data, error } = await applyTestMode(
+    db
+      .from("cases")
+      .select("case_id, account_id, client_id, status, close_reason, urgent_flag, rally_used, opened_at, last_activity_at, closed_at, awaiting_reply_since, is_test, counselor:counselors!fk_cases_counselor(name)")
+      .gte("opened_at", range.fromTs)
+      .lte("opened_at", range.toTs),
+    testMode,
+  )
     .order("opened_at", { ascending: true })
     .limit(EXPORT_MAX_ROWS + 1);
   if (error) throw createError({ statusCode: 500, statusMessage: "query_failed" });
@@ -56,13 +62,13 @@ export default defineEventHandler(async (event) => {
   await writeAudit(event, staff, {
     action: "export.cases",
     targetType: "cases",
-    reason: `案件明細 ${range.from}〜${range.to}／${rows.length}件`,
+    reason: `案件明細 ${range.from}〜${range.to}／${rows.length}件／テスト：${testLabel(testMode)}`,
   });
 
   const header = [
     "案件ID", "付与元", "契約クライアント名", "担当相談員", "利用権付与日時", "初回メッセージ受信日時", "初回返信日時", "最終メッセージ日時",
     "ステータス", "終了の理由", "適用SLA（時間）", "初回返信までの時間（時間）", "SLA遵守（暦時間・仮）", "適用ラリー回数", "残ラリー回数",
-    "緊急フラグ", "アンケートの緊急度", "相談ジャンル",
+    "緊急フラグ", "アンケートの緊急度", "相談ジャンル", "テスト区分",
   ];
   const out = rows.map((r) => {
     const l = limits.get(r.case_id);
@@ -90,6 +96,7 @@ export default defineEventHandler(async (event) => {
       r.urgent_flag ? "あり" : "",
       survey.get(r.case_id)?.hurry ?? "",
       survey.get(r.case_id)?.genre ?? "",
+      r.is_test ? "テスト" : "",
     ];
   });
   return sendCsv(event, `cases_${range.from}_${range.to}.csv`, toCsv(header, out));

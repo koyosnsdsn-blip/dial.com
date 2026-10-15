@@ -9,6 +9,8 @@ type Account = {
   tier: "free" | "paid" | "member";
   clientName: string | null;
   postingSuspended: boolean;
+  isTest: boolean;
+  testByClient: boolean;
   createdAt: string;
   deleted: boolean;
   caseCount: number;
@@ -75,6 +77,24 @@ async function setTier(next: "free" | "paid") {
   }
 }
 
+// テストフラグ：このアカウントの案件を、すべてテストとして扱う
+const testReason = ref("");
+async function setTest(next: boolean) {
+  if (!account.value) return;
+  saving.value = true;
+  errorMessage.value = "";
+  try {
+    await $fetch<unknown>(`/api/ops/accounts/${account.value.accountId}`, { method: "PATCH", body: { isTest: next, reason: testReason.value } });
+    testReason.value = "";
+    await search();
+    message.value = next ? "テスト用のアカウントに設定しました。" : "テスト用の設定を解除しました。";
+  } catch (e: any) {
+    errorMessage.value = apiErrorMessage(e);
+  } finally {
+    saving.value = false;
+  }
+}
+
 // 開示請求の受付（要件 7.13.2）
 const disclosureNote = ref("");
 const disclosureDone = ref(false);
@@ -112,7 +132,7 @@ async function createDisclosure() {
       <p v-if="searched && !account && !errorMessage" class="note">該当するアカウントは見つかりませんでした。</p>
 
       <section v-if="account" class="panel">
-        <h2>{{ account.nickname ?? account.email }}</h2>
+        <h2>{{ account.nickname ?? account.email }}<span v-if="account.isTest || account.testByClient" class="badge test">テスト</span></h2>
         <dl class="meta">
           <dt>会員区分</dt><dd>{{ tierLabel[account.tier] }}<span v-if="account.deleted" class="badge muted">退会済み</span></dd>
           <dt>所属クライアント</dt><dd>{{ account.clientName ?? "—" }}</dd>
@@ -138,6 +158,17 @@ async function createDisclosure() {
               {{ account.tier === "paid" ? "無料会員に戻す" : "月額会員にする" }}
             </button>
           </template>
+          <h3>テスト用のアカウント</h3>
+          <p v-if="account.testByClient" class="note">所属クライアントがテスト用のため、このアカウントの案件は常にテストとして扱われます（クライアント側の設定で変更します）。</p>
+          <p class="note">
+            {{ account.isTest ? "このアカウントはテスト用に設定されています。" : "オンにすると、このアカウントの案件がすべて「テスト」になり、案件一覧・監査ログ・CSV出力で見分けられます。" }}
+            既存の案件にもすぐ反映されます。
+          </p>
+          <label for="test-reason">理由（必須）</label>
+          <input id="test-reason" v-model="testReason" maxlength="500" placeholder="例：動作確認用のアカウント" />
+          <button class="secondary" type="button" :disabled="saving || testReason.trim() === ''" @click="setTest(!account.isTest)">
+            {{ account.isTest ? "テスト用を解除する" : "テスト用に設定する" }}
+          </button>
           <h3>投稿機能の{{ account.postingSuspended ? "停止を解除する" : "停止" }}</h3>
           <p class="note">停止するのはQ&Aへの投稿だけです。Q&Aの閲覧と、相談の利用は停止しません。</p>
           <label for="reason">理由（必須）</label>
@@ -165,4 +196,5 @@ button { width: auto; padding: 8px 16px; }
 .meta dd { margin: 0; }
 .badge { display: inline-block; margin-left: 8px; padding: 2px 8px; font-size: 12px; border-radius: 10px; background: #eaeef2; color: var(--muted); }
 .badge.waiting { background: #fff8c5; color: #7d4e00; }
+.badge.test { background: #efe5ff; color: #6639ba; font-weight: 700; }
 </style>
